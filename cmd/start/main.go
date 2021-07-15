@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -35,24 +34,24 @@ func main() {
 		"ETCD_AUTO_COMPACTION_RETENTION": "1",
 	}
 
-	go func() {
-		t := time.NewTicker(1 * time.Second)
-		defer t.Stop()
+	// go func() {
+	// 	t := time.NewTicker(1 * time.Second)
+	// 	defer t.Stop()
 
-		for range t.C {
+	// 	for range t.C {
 
-			client, err := flyetcd.NewClient(node)
-			if err != nil {
-				panic(err)
-			}
+	// 		client, err := flyetcd.NewClient(node)
+	// 		if err != nil {
+	// 			panic(err)
+	// 		}
 
-			// Wait for cluster health
+	// 		// Wait for cluster health
 
-			if err = client.InitializeAuth(context.TODO()); err != nil {
-				panic(err)
-			}
-		}
-	}()
+	// 		// if err = client.InitializeAuth(context.TODO()); err != nil {
+	// 		// 	panic(err)
+	// 		// }
+	// 	}
+	// }()
 
 	svisor := supervisor.New("flyetcd", 5*time.Minute)
 

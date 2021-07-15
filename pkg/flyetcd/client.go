@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	etcdClient "go.etcd.io/etcd/client/v3"
 )
 
@@ -30,25 +31,35 @@ func NewClient(node *Node) (*EtcdClient, error) {
 }
 
 func (c *EtcdClient) InitializeAuth(ctx context.Context) error {
-	if err := c.CreateUser(ctx, "root", envOrDefault("ROOT_PASSWORD", "password")); err != nil {
+	fmt.Println("Adding root user.")
+	if err := c.CreateUser(ctx, "root", "password"); err != nil {
 		return err
 	}
+
+	fmt.Println("Granting role root to user root.")
+
 	if err := c.GrantRoleToUser(ctx, "root", "root"); err != nil {
 		return err
 	}
 
+	fmt.Println("Enabling authentication.")
 	if err := c.EnableAuthentication(ctx); err != nil {
 		return err
 	}
+
+	fmt.Println("Done with Initializing Auth.")
 
 	return nil
 }
 
 func (c *EtcdClient) CreateUser(ctx context.Context, user, password string) error {
-	_, err := c.Client.UserAdd(ctx, user, password)
+	resp, err := c.Client.UserAdd(ctx, user, password)
 	if err != nil {
-		return err
+		if err != rpctypes.ErrUserAlreadyExist {
+			return err
+		}
 	}
+	fmt.Println(resp)
 	return nil
 }
 

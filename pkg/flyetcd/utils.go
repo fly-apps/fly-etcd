@@ -12,7 +12,7 @@ import (
 )
 
 func (n *Node) WaitForBuddies(appName string, expectedMembers int) (bool, error) {
-	fmt.Printf("Waiting for all %d nodes to come online. Waiting for 5 minutes...\n", expectedMembers)
+	fmt.Printf("Waiting for all %d nodes to come online. (Timeout: 5 minutes)\n", expectedMembers)
 	timeout := time.After(5 * time.Minute)
 	tick := time.Tick(1 * time.Second)
 	for {
