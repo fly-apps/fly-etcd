@@ -1,0 +1,26 @@
+# fly.toml file generated for polished-wave-8028 on 2021-07-15T10:26:20-05:00
+
+app = "polished-wave-8028"
+
+kill_signal = "SIGINT"
+kill_timeout = 5
+
+[env]
+
+[experimental]
+  private_network = true
+
+[metrics]
+  path = "/metrics"
+  port = 2379
+
+[[mounts]]
+  destination = "/etcd_data"
+  source = "etcd_data"
+
+[[services]]
+  internal_port = "2379"
+
+  [[services.ports]]
+    handlers = []
+    port = "10000"
