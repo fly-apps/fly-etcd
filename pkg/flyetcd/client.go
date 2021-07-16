@@ -21,7 +21,6 @@ func NewClient(node *Node) (*EtcdClient, error) {
 		DialTimeout:       20 * time.Second,
 		DialKeepAliveTime: 1 * time.Second,
 	}
-
 	c, err := etcdClient.New(config)
 	if err != nil {
 		return nil, err
@@ -31,45 +30,65 @@ func NewClient(node *Node) (*EtcdClient, error) {
 }
 
 func (c *EtcdClient) InitializeAuth(ctx context.Context) error {
-	fmt.Println("Adding root user.")
-	if err := c.CreateUser(ctx, "root", "password"); err != nil {
-		return err
+	if err := c.CreateUser(ctx, "root", envOrDefault("ETCD_PASSWORD", "password")); err != nil {
+		switch err {
+		case rpctypes.ErrUserAlreadyExist:
+		case rpctypes.ErrUserEmpty: // Auth has already been enabled.
+			return nil
+		default:
+			return err
+		}
 	}
-
-	fmt.Println("Granting role root to user root.")
 
 	if err := c.GrantRoleToUser(ctx, "root", "root"); err != nil {
 		return err
 	}
 
-	fmt.Println("Enabling authentication.")
 	if err := c.EnableAuthentication(ctx); err != nil {
 		return err
 	}
 
-	fmt.Println("Done with Initializing Auth.")
-
 	return nil
+}
+
+func (c *EtcdClient) MemberId(ctx context.Context, name string) (uint64, error) {
+	resp, err := c.Client.MemberList(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, member := range resp.Members {
+		if member.Name == name {
+			return member.ID, nil
+		}
+	}
+	return 0, fmt.Errorf("Unable to find member id for name: %q", name)
+}
+
+func (c *EtcdClient) IsLeader(ctx context.Context, node *Node) (bool, error) {
+	resp, err := c.Client.Status(ctx, node.Config.AdvertiseClientUrls)
+	if err != nil {
+		return false, err
+	}
+
+	id, err := c.MemberId(ctx, node.Config.Name)
+	if err != nil {
+		return false, err
+	}
+
+	if resp.Leader == id {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (c *EtcdClient) CreateUser(ctx context.Context, user, password string) error {
-	resp, err := c.Client.UserAdd(ctx, user, password)
+	_, err := c.Client.UserAdd(ctx, user, password)
 	if err != nil {
-		if err != rpctypes.ErrUserAlreadyExist {
-			return err
-		}
+		return err
 	}
-	fmt.Println(resp)
 	return nil
 }
-
-// func (c *EtcdClient) CreateRole(ctx context.Context, name string) error {
-// 	_, err := c.Client.RoleAdd(ctx, name)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
 
 func (c *EtcdClient) GrantRoleToUser(ctx context.Context, role, user string) error {
 	_, err := c.Client.UserGrantRole(ctx, user, role)

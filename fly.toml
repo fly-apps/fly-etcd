@@ -1,6 +1,6 @@
-# fly.toml file generated for young-sky-3723 on 2021-07-15T11:57:17-05:00
+# fly.toml file generated for old-pond-2370 on 2021-07-16T11:09:05-05:00
 
-app = "young-sky-3723"
+app = "old-pond-2370"
 
 kill_signal = "SIGINT"
 kill_timeout = 5
@@ -8,7 +8,8 @@ kill_timeout = 5
 [env]
 
 [experimental]
-  private_network = true
+  allowed_public_ports = []
+  auto_rollback = false
 
 [metrics]
   path = "/metrics"
@@ -19,8 +20,16 @@ kill_timeout = 5
   source = "etcd_data"
 
 [[services]]
-  internal_port = "2379"
+  internal_port = 2379
+
+  [services.concurrency]
 
   [[services.ports]]
     handlers = []
-    port = "10000"
+    port = 10000
+
+  [[services.tcp_checks]]
+    grace_period = "1s"
+    interval = "15s"
+    restart_limit = 6
+    timeout = "2s"

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -8,54 +9,46 @@ import (
 	"time"
 
 	"github.com/fly-examples/fly-etcd/pkg/flyetcd"
+	"github.com/fly-examples/fly-etcd/pkg/privnet"
 	"github.com/fly-examples/fly-etcd/pkg/supervisor"
 )
 
 func main() {
+
+	if err := WaitForMembers(3); err != nil {
+		panic(err)
+	}
+
 	node, err := flyetcd.NewNode()
 	if err != nil {
 		panic(err)
 	}
 
-	memberEnv := map[string]string{
-		// Member flags
-		"ETCD_NAME":               node.Name,
-		"ETCD_DATA_DIR":           node.Datadir,
-		"ETCD_LISTEN_PEER_URLS":   node.ListenPeerUrls,
-		"ETCD_LISTEN_CLIENT_URLS": node.ListenClientUrls,
-		// Clustering flags
-		"ETCD_INITIAL_ADVERTISE_PEER_URLS": node.InitialAdvertisePeerUrls,
-		"ETCD_ADVERTISE_CLIENT_URLS":       node.AdvertiseClientUrls,
-		"ETCD_INITIAL_CLUSTER":             node.InitialCluster,
-		"ETCD_INITIAL_CLUSTER_STATE":       node.InitialClusterState,
-		"ETCD_INITIAL_CLUSTER_TOKEN":       node.InitialClusterToken,
-		// Compaction retention
-		"ETCD_AUTO_COMPACTION_MODE":      "periodic",
-		"ETCD_AUTO_COMPACTION_RETENTION": "1",
-	}
+	go func() {
+		t := time.NewTicker(1 * time.Second)
+		defer t.Stop()
 
-	// go func() {
-	// 	t := time.NewTicker(1 * time.Second)
-	// 	defer t.Stop()
-
-	// 	for range t.C {
-
-	// 		client, err := flyetcd.NewClient(node)
-	// 		if err != nil {
-	// 			panic(err)
-	// 		}
-
-	// 		// Wait for cluster health
-
-	// 		// if err = client.InitializeAuth(context.TODO()); err != nil {
-	// 		// 	panic(err)
-	// 		// }
-	// 	}
-	// }()
+		for range t.C {
+			client, err := flyetcd.NewClient(node)
+			if err != nil {
+				panic(err)
+			}
+			isLeader, err := client.IsLeader(context.TODO(), node)
+			if err != nil {
+				panic(err)
+			}
+			if isLeader {
+				fmt.Printf("Leader found: %q \n", node.Config.Name)
+				if err = client.InitializeAuth(context.TODO()); err != nil {
+					panic(err)
+				}
+			}
+			return
+		}
+	}()
 
 	svisor := supervisor.New("flyetcd", 5*time.Minute)
-
-	svisor.AddProcess("flyetcd", "etcd", supervisor.WithEnv(memberEnv))
+	svisor.AddProcess("flyetcd", "etcd --config-file /etcd_data/etcd.yaml")
 
 	sigch := make(chan os.Signal)
 	signal.Notify(sigch, syscall.SIGINT, syscall.SIGTERM)
@@ -67,4 +60,27 @@ func main() {
 	}()
 
 	svisor.Run()
+}
+
+func WaitForMembers(expectedMembers int) error {
+	fmt.Printf("Waiting for all %d nodes to come online. (Timeout: 5 minutes)\n", expectedMembers)
+
+	timeout := time.After(5 * time.Minute)
+	tick := time.Tick(1 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("Timed out waiting for my buddies")
+		case <-tick:
+			addrs, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
+			if err != nil {
+				// It can take DNS a little bit to come up.
+				continue
+			}
+			if len(addrs) == expectedMembers {
+				return nil
+			}
+			time.Sleep(1 * time.Second)
+		}
+	}
 }
