@@ -15,7 +15,7 @@ import (
 
 func main() {
 
-	if err := WaitForMembers(3); err != nil {
+	if err := WaitForMembers(1); err != nil {
 		panic(err)
 	}
 
@@ -29,20 +29,33 @@ func main() {
 		defer t.Stop()
 
 		for range t.C {
-			client, err := flyetcd.NewClient(node)
-			if err != nil {
-				panic(err)
+			// If we have already been bootstrapped, we can short-circuit.
+			if node.Bootstrapped {
+				return
 			}
-			isLeader, err := client.IsLeader(context.TODO(), node)
-			if err != nil {
-				panic(err)
-			}
-			if isLeader {
-				fmt.Printf("Leader found: %q \n", node.Config.Name)
-				if err = client.InitializeAuth(context.TODO()); err != nil {
-					panic(err)
-				}
-			}
+
+			// client, err := flyetcd.NewClient(node.AppName)
+			// if err != nil {
+			// 	panic(err)
+			// }
+
+			// isLeader, err := client.IsLeader(context.TODO(), node)
+			// if err != nil {
+			// 	if err, ok := err.(*MemberNotFoundError); ok {
+			// 		// We are a new member, lets add ourselve to the cluster.
+			// 		client.A
+
+			// 	}
+			// 	panic(err)
+			// }
+			// if isLeader {
+			// 	fmt.Printf("Leader found: %q \n", node.Config.Name)
+			// 	if err = client.InitializeAuth(context.TODO()); err != nil {
+			// 		panic(err)
+			// 	}
+			// }
+			node.WriteBootstrapLock()
+
 			return
 		}
 	}()
@@ -77,7 +90,7 @@ func WaitForMembers(expectedMembers int) error {
 				// It can take DNS a little bit to come up.
 				continue
 			}
-			if len(addrs) == expectedMembers {
+			if len(addrs) >= expectedMembers {
 				return nil
 			}
 			time.Sleep(1 * time.Second)

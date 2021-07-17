@@ -5,20 +5,29 @@ import (
 	"fmt"
 	"time"
 
+	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	etcdClient "go.etcd.io/etcd/client/v3"
 )
+
+type MemberNotFoundError struct {
+	Err error
+}
+
+func (e *MemberNotFoundError) Error() string {
+	return fmt.Sprintf("%v", e.Err)
+}
 
 type EtcdClient struct {
 	Client *etcdClient.Client
 }
 
-func NewClient(node *Node) (*EtcdClient, error) {
-	endpoint := fmt.Sprintf("http://%s.internal:2379", node.AppName)
+func NewClient(appName string) (*EtcdClient, error) {
+	endpoint := fmt.Sprintf("http://%s.internal:2379", appName)
 
 	config := etcdClient.Config{
 		Endpoints:         []string{endpoint},
-		DialTimeout:       20 * time.Second,
+		DialTimeout:       10 * time.Second,
 		DialKeepAliveTime: 1 * time.Second,
 	}
 	c, err := etcdClient.New(config)
@@ -51,17 +60,35 @@ func (c *EtcdClient) InitializeAuth(ctx context.Context) error {
 	return nil
 }
 
-func (c *EtcdClient) MemberId(ctx context.Context, name string) (uint64, error) {
+func (c *EtcdClient) MemberAdd(ctx context.Context, name, peerUrl string) error {
+	// peer := fmt.Sprintf("%s=%s", name, peerUrl)
+	_, err := c.Client.MemberAdd(ctx, []string{peerUrl})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *EtcdClient) MemberList(ctx context.Context) ([]*etcdserverpb.Member, error) {
 	resp, err := c.Client.MemberList(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Members, nil
+}
+
+func (c *EtcdClient) MemberId(ctx context.Context, name string) (uint64, error) {
+	members, err := c.MemberList(ctx)
 	if err != nil {
 		return 0, err
 	}
-	for _, member := range resp.Members {
+	for _, member := range members {
 		if member.Name == name {
 			return member.ID, nil
 		}
 	}
-	return 0, fmt.Errorf("Unable to find member id for name: %q", name)
+	return 0, &MemberNotFoundError{Err: fmt.Errorf("no member found with matching name %q", name)}
 }
 
 func (c *EtcdClient) IsLeader(ctx context.Context, node *Node) (bool, error) {
