@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -13,55 +14,45 @@ import (
 	"github.com/fly-examples/fly-etcd/pkg/supervisor"
 )
 
+// TODO - Don't bootstrap the initial cluster until the number of discoverable ips
+// matches the target cluster size.
+
+// Idea:  Expose lightweight rest api that nodes can use to communicate with other members outside
+// of Etcd. If new members come online that haven't been bootstrapped, this would provide a way for them
+// to check-in with the other members and see if they've been bootstrapped or not.
+
 func main() {
 
-	if err := WaitForMembers(1); err != nil {
-		panic(err)
+	targetSizeStr := os.Getenv("TARGET_CLUSTER_SIZE")
+	if targetSizeStr == "" {
+		panic(fmt.Errorf("TARGET_CLUSTER_SIZE environment variable required."))
 	}
 
-	node, err := flyetcd.NewNode()
-	if err != nil {
-		panic(err)
-	}
-
-	go func() {
-		t := time.NewTicker(1 * time.Second)
-		defer t.Stop()
-
-		for range t.C {
-			// If we have already been bootstrapped, we can short-circuit.
-			if node.Bootstrapped {
-				return
-			}
-
-			// client, err := flyetcd.NewClient(node.AppName)
-			// if err != nil {
-			// 	panic(err)
-			// }
-
-			// isLeader, err := client.IsLeader(context.TODO(), node)
-			// if err != nil {
-			// 	if err, ok := err.(*MemberNotFoundError); ok {
-			// 		// We are a new member, lets add ourselve to the cluster.
-			// 		client.A
-
-			// 	}
-			// 	panic(err)
-			// }
-			// if isLeader {
-			// 	fmt.Printf("Leader found: %q \n", node.Config.Name)
-			// 	if err = client.InitializeAuth(context.TODO()); err != nil {
-			// 		panic(err)
-			// 	}
-			// }
-			node.WriteBootstrapLock()
-
-			return
+	// New node setup.
+	if !flyetcd.Bootstrapped() {
+		targetMembers, err := strconv.Atoi(targetSizeStr)
+		if err != nil {
+			panic(err)
 		}
-	}()
 
+		fmt.Printf("Waiting for required cluster members to come online. Make sure you have provisioned %s volumes and scaled your app accordingly.", targetSizeStr)
+		if err := WaitForMembers(targetMembers); err != nil {
+			panic(err)
+		}
+
+		_, err = flyetcd.NewNode()
+		if err != nil {
+			panic(err)
+		}
+
+		flyetcd.WriteBootstrapLock()
+	}
+
+	// Start main Etcd process.
 	svisor := supervisor.New("flyetcd", 5*time.Minute)
-	svisor.AddProcess("flyetcd", "etcd --config-file /etcd_data/etcd.yaml")
+
+	svisor.AddProcess("flyetcd-api", "start_api")
+	svisor.AddProcess("flyetcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
 
 	sigch := make(chan os.Signal)
 	signal.Notify(sigch, syscall.SIGINT, syscall.SIGTERM)
@@ -73,6 +64,7 @@ func main() {
 	}()
 
 	svisor.Run()
+
 }
 
 func WaitForMembers(expectedMembers int) error {

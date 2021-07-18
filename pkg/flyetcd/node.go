@@ -19,9 +19,8 @@ type Node struct {
 	AppName      string
 	PrivateIp    string
 	Bootstrapped bool
-
-	EtcdClient *EtcdClient
-	Config     *Config
+	EtcdClient   *EtcdClient
+	Config       *Config
 }
 
 // Example configuration file: https://github.com/etcd-io/etcd/blob/release-3.5/etcd.conf.yml.sample
@@ -41,70 +40,58 @@ type Config struct {
 }
 
 func NewNode() (*Node, error) {
-
 	privateIp, err := privnet.PrivateIPv6()
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := NewClient(envOrDefault("FLY_APP_NAME", "local"))
 	if err != nil {
 		return nil, err
 	}
 
 	node := &Node{
 		AppName:      envOrDefault("FLY_APP_NAME", "local"),
-		Bootstrapped: IsBootstrapped(),
+		Bootstrapped: Bootstrapped(),
 		PrivateIp:    privateIp.String(),
+		EtcdClient:   client,
 	}
 
-	if node.Bootstrapped {
-		fmt.Println("Member has already been bootstrapped, loading configuration.")
-		node.LoadConfig()
-		// TODO - When loading from disk, we should consider generating a new
-		// config as well so we can apply new defaults that may have been set
-		// and check for inconsistencies revolving around the initial cluster so we can
-		// respond accordingly.
-	} else {
-		fmt.Println("New member found. Generating configuration.")
-		// If we haven't been bootstrapped yet we are in one of two conditions:
-		// 1. Cluster is just coming up for the first time.
-		// 2. Cluster has already been bootstrapped and we need to add ourselves to the cluster at runtime.
+	existingCluster, err := ClusterBootstrapped()
+	if err != nil {
+		return nil, err
+	}
 
-		if err := node.GenerateConfig(); err != nil {
-			return nil, err
-		}
+	if err := node.GenerateConfig(!existingCluster); err != nil {
+		return nil, err
+	}
 
-		fmt.Println("Checking to see if we can access the current cluster.")
-		requestTimeout := 10 * time.Second
-		ctx, cancel := context.WithTimeout(context.TODO(), requestTimeout)
-		_, err = node.EtcdClient.MemberId(ctx, node.Config.Name)
+	if existingCluster {
+		// Add at runtime
+		fmt.Printf("Existing cluster detected, adding %s at runtime.\n", node.Config.ListenPeerUrls)
+
+		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
+		err = node.EtcdClient.MemberAdd(ctx, node.Config.ListenPeerUrls)
 		cancel()
 		if err != nil {
-			if _, ok := err.(*MemberNotFoundError); !ok {
-				fmt.Println("Unable to access the cluster, assuming this is first provision.")
-				node.WriteConfig()
-				return node, nil
-			}
-		}
-
-		fmt.Printf("Attempting to add member at runtime. Name: %q, Peer: %q", node.Config.Name, node.Config.ListenPeerUrls)
-
-		// Add new member at runtime.
-		if err = node.EtcdClient.MemberAdd(context.TODO(), node.Config.Name, node.Config.ListenPeerUrls); err != nil {
 			return nil, err
 		}
 
-		fmt.Println("Member added!  Regenerating configuration file.")
-		if err = node.GenerateConfig(); err != nil {
-			return nil, err
-		}
-		// State needs to be set to existing when adding at runtime.
 		node.Config.InitialClusterState = "existing"
-		node.WriteConfig()
 	}
+
+	node.WriteConfig()
 
 	return node, nil
 }
 
-func (n *Node) GenerateConfig() error {
+func (n *Node) GenerateConfig(bootstrap bool) error {
 	peerUrl := fmt.Sprintf("http://[%s]:2380", n.PrivateIp)
 	clientUrl := fmt.Sprintf("http://[%s]:2379", n.PrivateIp)
+	initialClusterState := "existing"
+	if bootstrap {
+		initialClusterState = "new"
+	}
 	config := &Config{
 		Name:                     getMD5Hash(n.PrivateIp),
 		DataDir:                  "/etcd_data",
@@ -112,7 +99,7 @@ func (n *Node) GenerateConfig() error {
 		AdvertiseClientUrls:      clientUrl,
 		ListenClientUrls:         "http://0.0.0.0:2379",
 		InitialAdvertisePeerUrls: peerUrl,
-		InitialClusterState:      "new",
+		InitialClusterState:      initialClusterState,
 		InitialClusterToken:      getMD5Hash(n.AppName),
 		AutoCompactionMode:       "periodic",
 		AutoCompactionRetention:  "1",
@@ -161,7 +148,7 @@ func WriteBootstrapLock() error {
 	return ioutil.WriteFile(BootstrapLockFilePath, []byte{}, 0700)
 }
 
-func IsBootstrapped() bool {
+func Bootstrapped() bool {
 	if _, err := os.Stat(BootstrapLockFilePath); err != nil {
 		return false
 	}

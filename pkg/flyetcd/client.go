@@ -60,12 +60,18 @@ func (c *EtcdClient) InitializeAuth(ctx context.Context) error {
 	return nil
 }
 
-func (c *EtcdClient) MemberAdd(ctx context.Context, name, peerUrl string) error {
+func (c *EtcdClient) MemberAdd(ctx context.Context, peerUrl string) error {
 	// peer := fmt.Sprintf("%s=%s", name, peerUrl)
-	_, err := c.Client.MemberAdd(ctx, []string{peerUrl})
+	fmt.Printf("Attempting to add peer: %s\n", peerUrl)
+	peers := []string{peerUrl}
+
+	resp, err := c.Client.MemberAdd(ctx, peers)
 	if err != nil {
-		return err
+		fmt.Println(err.Error())
 	}
+
+	fmt.Printf("%+v ", resp)
+
 	return nil
 }
 
