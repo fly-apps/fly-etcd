@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"strconv"
@@ -82,10 +83,27 @@ func WaitForMembers(expectedMembers int) error {
 				// It can take DNS a little bit to come up.
 				continue
 			}
-			if len(addrs) >= expectedMembers {
+
+			// Protect against duplicate entries.
+			currentMembers := removeDuplicateValues(addrs)
+
+			if len(currentMembers) >= expectedMembers {
 				return nil
 			}
 			time.Sleep(1 * time.Second)
 		}
 	}
+}
+
+func removeDuplicateValues(addrs []net.IPAddr) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+	for _, addr := range addrs {
+		addrStr := addr.String()
+		if _, value := keys[addrStr]; !value {
+			keys[addrStr] = true
+			list = append(list, addrStr)
+		}
+	}
+	return list
 }

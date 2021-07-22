@@ -45,28 +45,29 @@ func NewNode() (*Node, error) {
 		return nil, err
 	}
 
-	client, err := NewClient(envOrDefault("FLY_APP_NAME", "local"))
-	if err != nil {
-		return nil, err
-	}
-
 	node := &Node{
 		AppName:      envOrDefault("FLY_APP_NAME", "local"),
-		Bootstrapped: Bootstrapped(),
 		PrivateIp:    privateIp.String(),
-		EtcdClient:   client,
+		Bootstrapped: Bootstrapped(),
 	}
 
-	existingCluster, err := ClusterBootstrapped()
+	client, err := NewClient(node.AppName)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := node.GenerateConfig(!existingCluster); err != nil {
+	node.EtcdClient = client
+
+	bootstrapped, err := ClusterBootstrapped()
+	if err != nil {
 		return nil, err
 	}
 
-	if existingCluster {
+	if err := node.GenerateConfig(!bootstrapped); err != nil {
+		return nil, err
+	}
+
+	if bootstrapped {
 		// Add at runtime
 		fmt.Printf("Existing cluster detected, adding %s at runtime.\n", node.Config.ListenPeerUrls)
 
