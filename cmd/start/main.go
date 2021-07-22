@@ -15,13 +15,6 @@ import (
 	"github.com/fly-examples/fly-etcd/pkg/supervisor"
 )
 
-// TODO - Don't bootstrap the initial cluster until the number of discoverable ips
-// matches the target cluster size.
-
-// Idea:  Expose lightweight rest api that nodes can use to communicate with other members outside
-// of Etcd. If new members come online that haven't been bootstrapped, this would provide a way for them
-// to check-in with the other members and see if they've been bootstrapped or not.
-
 func main() {
 
 	targetSizeStr := os.Getenv("TARGET_CLUSTER_SIZE")
@@ -36,7 +29,7 @@ func main() {
 			panic(err)
 		}
 
-		fmt.Printf("Waiting for required cluster members to come online. Make sure you have provisioned %s volumes and scaled your app accordingly.", targetSizeStr)
+		fmt.Println("Waiting for members to come online.")
 		if err := WaitForMembers(targetMembers); err != nil {
 			panic(err)
 		}
@@ -86,7 +79,6 @@ func WaitForMembers(expectedMembers int) error {
 
 			// Protect against duplicate entries.
 			currentMembers := removeDuplicateValues(addrs)
-
 			if len(currentMembers) >= expectedMembers {
 				return nil
 			}

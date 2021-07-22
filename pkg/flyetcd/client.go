@@ -75,12 +75,13 @@ func (c *EtcdClient) MemberAdd(ctx context.Context, peerUrl string) error {
 	return nil
 }
 
-func (c *EtcdClient) MemberList(ctx context.Context) ([]*etcdserverpb.Member, error) {
+func (c *EtcdClient) MemberList(parentCtx context.Context) ([]*etcdserverpb.Member, error) {
+	ctx, cancel := context.WithTimeout(parentCtx, (5 * time.Second))
 	resp, err := c.Client.MemberList(ctx)
+	cancel()
 	if err != nil {
 		return nil, err
 	}
-
 	return resp.Members, nil
 }
 

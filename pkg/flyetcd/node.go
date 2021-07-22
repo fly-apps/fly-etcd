@@ -58,10 +58,12 @@ func NewNode() (*Node, error) {
 
 	node.EtcdClient = client
 
-	bootstrapped, err := ClusterBootstrapped()
+	bootstrapped := ClusterBootstrapped(client)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("Cluster bootstrap status: %t\n", bootstrapped)
 
 	if err := node.GenerateConfig(!bootstrapped); err != nil {
 		return nil, err
