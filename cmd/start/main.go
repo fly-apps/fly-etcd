@@ -52,7 +52,7 @@ func main() {
 	// Start main Etcd process.
 	svisor := supervisor.New("flyetcd", 5*time.Minute)
 
-	svisor.AddProcess("flyetcd-api", "start_api")
+	// svisor.AddProcess("flyetcd-api", "start_api")
 	svisor.AddProcess("flyetcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
 
 	sigch := make(chan os.Signal)
