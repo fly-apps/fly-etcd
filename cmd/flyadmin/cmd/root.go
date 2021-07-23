@@ -8,7 +8,7 @@ import (
 
 var (
 	rootCmd = &cobra.Command{
-		Use:   "Etcd admin",
+		Use:   "flyadmin",
 		Short: "Quick way to interface with Etcd",
 		Long:  `Quick way to interface with Etcd`,
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,14 +16,50 @@ import (
 
 func init() {
 	rootCmd.AddCommand(membersCmd)
+	membersCmd.AddCommand(membersListCmd)
+	membersCmd.AddCommand(memberRemoveCmd)
 }
 
 var membersCmd = &cobra.Command{
 	Use:   "members",
-	Short: "List Etcd members",
-	Long:  `List Etcd members`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Short: "Manage Etcd members",
+	Long:  `Manage Etcd cluster members`,
+}
 
+var memberRemoveCmd = &cobra.Command{
+	Use:   "remove <id>",
+	Short: "Remove member",
+	Long:  "Remove member from cluster",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		client, err := flyetcd.NewClient(AppName())
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		id := args[0]
+		i64, err := strconv.ParseUint(id, 16, 64)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
+		members, err := client.MemberRemove(ctx, i64)
+		cancel()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+
+		printMembersTable(members)
+	},
+}
+
+var membersListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List all members",
+	Long:  "Lists all the Etcd members in the cluster",
+	Run: func(cmd *cobra.Command, args []string) {
 		client, err := flyetcd.NewClient(AppName())
 		if err != nil {
 			fmt.Println(err.Error())
@@ -37,15 +74,19 @@ var membersCmd = &cobra.Command{
 			return
 		}
 
-		hdr, rows := makeMemberListTable(members)
-		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader(hdr)
-		for _, row := range rows {
-			table.Append(row)
-		}
-		table.SetAlignment(tablewriter.ALIGN_RIGHT)
-		table.Render()
+		printMembersTable(members)
 	},
+}
+
+func printMembersTable(members []*etcdserverpb.Member) {
+	hdr, rows := makeMemberListTable(members)
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader(hdr)
+	for _, row := range rows {
+		table.Append(row)
+	}
+	table.SetAlignment(tablewriter.ALIGN_RIGHT)
+	table.Render()
 }
 
 func makeMemberListTable(members []*etcdserverpb.Member) (hdr []string, rows [][]string) {

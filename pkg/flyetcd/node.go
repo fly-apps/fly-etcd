@@ -74,7 +74,7 @@ func NewNode() (*Node, error) {
 		fmt.Printf("Existing cluster detected, adding %s at runtime.\n", node.Config.ListenPeerUrls)
 
 		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
-		err = node.EtcdClient.MemberAdd(ctx, node.Config.ListenPeerUrls)
+		_, err = node.EtcdClient.MemberAdd(ctx, node.Config.ListenPeerUrls)
 		cancel()
 		if err != nil {
 			return nil, err
