@@ -19,7 +19,6 @@ type Node struct {
 	AppName      string
 	PrivateIp    string
 	Bootstrapped bool
-	EtcdClient   *EtcdClient
 	Config       *Config
 }
 
@@ -56,8 +55,6 @@ func NewNode() (*Node, error) {
 		return nil, err
 	}
 
-	node.EtcdClient = client
-
 	bootstrapped := ClusterBootstrapped(client)
 	if err != nil {
 		return nil, err
@@ -74,7 +71,7 @@ func NewNode() (*Node, error) {
 		fmt.Printf("Existing cluster detected, adding %s at runtime.\n", node.Config.ListenPeerUrls)
 
 		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
-		_, err = node.EtcdClient.MemberAdd(ctx, node.Config.ListenPeerUrls)
+		_, err = client.MemberAdd(ctx, []string{node.Config.ListenPeerUrls})
 		cancel()
 		if err != nil {
 			return nil, err

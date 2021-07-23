@@ -34,14 +34,14 @@ var alarmsListCmd = &cobra.Command{
 			return
 		}
 		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
-		alarms, err := client.AlarmList(ctx)
+		resp, err := client.AlarmList(ctx)
 		cancel()
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
 
-		printAlarmsTable(alarms)
+		printAlarmsTable(resp.Alarms)
 	},
 }
 

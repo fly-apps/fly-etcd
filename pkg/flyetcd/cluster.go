@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-func ClusterBootstrapped(client *EtcdClient) bool {
+func ClusterBootstrapped(client *Client) bool {
 	_, err := client.MemberList(context.TODO())
 	if err != nil {
 		return false
