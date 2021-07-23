@@ -2,10 +2,13 @@ package flyetcd
 
 import (
 	"context"
+	"time"
 )
 
 func ClusterBootstrapped(client *Client) bool {
-	_, err := client.MemberList(context.TODO())
+	ctx, cancel := context.WithTimeout(context.TODO(), (5 * time.Second))
+	_, err := client.MemberList(ctx)
+	cancel()
 	if err != nil {
 		return false
 	}
