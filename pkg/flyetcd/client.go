@@ -1,6 +1,7 @@
 package flyetcd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -43,36 +44,36 @@ func NewClient(appName string) (*Client, error) {
 	return &Client{c}, nil
 }
 
-// func (c *EtcdClient) MemberId(ctx context.Context, name string) (uint64, error) {
-// 	members, err := c.MemberList(ctx)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	for _, member := range members {
-// 		if member.Name == name {
-// 			return member.ID, nil
-// 		}
-// 	}
-// 	return 0, &MemberNotFoundError{Err: fmt.Errorf("no member found with matching name %q", name)}
-// }
+func (c *Client) MemberId(ctx context.Context, name string) (uint64, error) {
+	resp, err := c.MemberList(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, member := range resp.Members {
+		if member.Name == name {
+			return member.ID, nil
+		}
+	}
+	return 0, &MemberNotFoundError{Err: fmt.Errorf("no member found with matching name %q", name)}
+}
 
-// func (c *EtcdClient) IsLeader(ctx context.Context, node *Node) (bool, error) {
-// 	resp, err := c.Client.Status(ctx, node.Config.AdvertiseClientUrls)
-// 	if err != nil {
-// 		return false, err
-// 	}
+func (c *Client) IsLeader(ctx context.Context, node *Node) (bool, error) {
+	resp, err := c.Client.Status(ctx, node.Config.InitialAdvertisePeerUrls)
+	if err != nil {
+		return false, err
+	}
 
-// 	id, err := c.MemberId(ctx, node.Config.Name)
-// 	if err != nil {
-// 		return false, err
-// 	}
+	id, err := c.MemberId(ctx, node.Config.Name)
+	if err != nil {
+		return false, err
+	}
 
-// 	if resp.Leader == id {
-// 		return true, nil
-// 	}
+	if resp.Leader == id {
+		return true, nil
+	}
 
-// 	return false, nil
-// }
+	return false, nil
+}
 
 // func (c *EtcdClient) InitializeAuth(ctx context.Context) error {
 // 	if err := c.CreateUser(ctx, "root", envOrDefault("ETCD_PASSWORD", "password")); err != nil {
