@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -15,40 +17,36 @@ import (
 
 func main() {
 
-	if err := WaitForMembers(3); err != nil {
-		panic(err)
+	targetSizeStr := os.Getenv("TARGET_CLUSTER_SIZE")
+	if targetSizeStr == "" {
+		panic(fmt.Errorf("TARGET_CLUSTER_SIZE environment variable required."))
 	}
 
-	node, err := flyetcd.NewNode()
-	if err != nil {
-		panic(err)
-	}
-
-	go func() {
-		t := time.NewTicker(1 * time.Second)
-		defer t.Stop()
-
-		for range t.C {
-			client, err := flyetcd.NewClient(node)
-			if err != nil {
-				panic(err)
-			}
-			isLeader, err := client.IsLeader(context.TODO(), node)
-			if err != nil {
-				panic(err)
-			}
-			if isLeader {
-				fmt.Printf("Leader found: %q \n", node.Config.Name)
-				if err = client.InitializeAuth(context.TODO()); err != nil {
-					panic(err)
-				}
-			}
-			return
+	// New node setup.
+	if !flyetcd.Bootstrapped() {
+		targetMembers, err := strconv.Atoi(targetSizeStr)
+		if err != nil {
+			panic(err)
 		}
-	}()
 
+		fmt.Println("Waiting for members to come online.")
+		if err := WaitForMembers(targetMembers); err != nil {
+			panic(err)
+		}
+
+		_, err = flyetcd.NewNode()
+		if err != nil {
+			panic(err)
+		}
+
+		flyetcd.WriteBootstrapLock()
+	}
+
+	// Start main Etcd process.
 	svisor := supervisor.New("flyetcd", 5*time.Minute)
-	svisor.AddProcess("flyetcd", "etcd --config-file /etcd_data/etcd.yaml")
+
+	// svisor.AddProcess("flyetcd-api", "start_api")
+	svisor.AddProcess("flyetcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
 
 	sigch := make(chan os.Signal)
 	signal.Notify(sigch, syscall.SIGINT, syscall.SIGTERM)
@@ -60,6 +58,7 @@ func main() {
 	}()
 
 	svisor.Run()
+
 }
 
 func WaitForMembers(expectedMembers int) error {
@@ -77,10 +76,26 @@ func WaitForMembers(expectedMembers int) error {
 				// It can take DNS a little bit to come up.
 				continue
 			}
-			if len(addrs) == expectedMembers {
+
+			// Protect against duplicate entries.
+			currentMembers := removeDuplicateValues(addrs)
+			if len(currentMembers) >= expectedMembers {
 				return nil
 			}
 			time.Sleep(1 * time.Second)
 		}
 	}
+}
+
+func removeDuplicateValues(addrs []net.IPAddr) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+	for _, addr := range addrs {
+		addrStr := addr.String()
+		if _, value := keys[addrStr]; !value {
+			keys[addrStr] = true
+			list = append(list, addrStr)
+		}
+	}
+	return list
 }

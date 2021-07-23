@@ -1,19 +1,26 @@
-# fly.toml file generated for old-pond-2370 on 2021-07-16T11:09:05-05:00
+# fly.toml file generated for still-star-2028 on 2021-07-21T23:13:53-05:00
 
-app = "old-pond-2370"
+app = "still-star-2028"
 
 kill_signal = "SIGINT"
 kill_timeout = 5
 
+[checks]
+
+  [checks.role]
+    args = ["vm"]
+    command = "flycheck"
+    interval = 60000
+    restart_limit = 0
+    timeout = 10000
+    type = "script"
+
 [env]
+  TARGET_CLUSTER_SIZE = 3 
 
 [experimental]
   allowed_public_ports = []
   auto_rollback = false
-
-[metrics]
-  path = "/metrics"
-  port = 2379
 
 [[mounts]]
   destination = "/etcd_data"
