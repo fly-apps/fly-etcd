@@ -55,18 +55,31 @@ func NewNode() (*Node, error) {
 		return nil, err
 	}
 
-	bootstrapped := ClusterBootstrapped(client)
-	if err != nil {
+	// Check to see if we are able to access the cluster.
+	// If the cluster is accessable we need to verify whether or not
+	// our peerUrl has already been registered.
+	clusterUp := false
+	memberRegistered := false
+	ctx, cancel := context.WithTimeout(context.TODO(), (5 * time.Second))
+	resp, err := client.MemberList(ctx)
+	cancel()
+	if err == nil {
+		clusterUp = true
+		for _, m := range resp.Members {
+			for _, p := range m.PeerURLs {
+				if p == fmt.Sprintf("http://[%s]:2380", node.PrivateIp) {
+					memberRegistered = true
+				}
+			}
+		}
+	}
+
+	fmt.Printf("Cluster up: %t, Member registered: %t\n", clusterUp, memberRegistered)
+	if err := node.GenerateConfig(); err != nil {
 		return nil, err
 	}
 
-	fmt.Printf("Cluster bootstrap status: %t\n", bootstrapped)
-
-	if err := node.GenerateConfig(!bootstrapped); err != nil {
-		return nil, err
-	}
-
-	if bootstrapped {
+	if clusterUp && !memberRegistered {
 		// Add at runtime
 		fmt.Printf("Existing cluster detected, adding %s at runtime.\n", node.Config.ListenPeerUrls)
 
@@ -80,18 +93,18 @@ func NewNode() (*Node, error) {
 		node.Config.InitialClusterState = "existing"
 	}
 
+	// WARNING: If the cluster isn't accessable, we can't really know the reason for it.
+	// If we have lost quorum or the cluster is heavily loaded this could potentially
+	// add fuel to the fire.
+
 	node.WriteConfig()
 
 	return node, nil
 }
 
-func (n *Node) GenerateConfig(bootstrap bool) error {
+func (n *Node) GenerateConfig() error {
 	peerUrl := fmt.Sprintf("http://[%s]:2380", n.PrivateIp)
 	clientUrl := fmt.Sprintf("http://[%s]:2379", n.PrivateIp)
-	initialClusterState := "existing"
-	if bootstrap {
-		initialClusterState = "new"
-	}
 	config := &Config{
 		Name:                     getMD5Hash(n.PrivateIp),
 		DataDir:                  "/etcd_data",
@@ -99,7 +112,7 @@ func (n *Node) GenerateConfig(bootstrap bool) error {
 		AdvertiseClientUrls:      clientUrl,
 		ListenClientUrls:         "http://0.0.0.0:2379",
 		InitialAdvertisePeerUrls: peerUrl,
-		InitialClusterState:      initialClusterState,
+		InitialClusterState:      "new",
 		InitialClusterToken:      getMD5Hash(n.AppName),
 		AutoCompactionMode:       "periodic",
 		AutoCompactionRetention:  "1",

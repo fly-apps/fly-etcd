@@ -22,14 +22,13 @@ func main() {
 		panic(fmt.Errorf("TARGET_CLUSTER_SIZE environment variable required."))
 	}
 
-	// New node setup.
 	if !flyetcd.Bootstrapped() {
+		// New node setup.
 		targetMembers, err := strconv.Atoi(targetSizeStr)
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Println("Waiting for members to come online.")
 		if err := WaitForMembers(targetMembers); err != nil {
 			panic(err)
 		}
@@ -45,7 +44,6 @@ func main() {
 	// Start main Etcd process.
 	svisor := supervisor.New("flyetcd", 5*time.Minute)
 
-	// svisor.AddProcess("flyetcd-api", "start_api")
 	svisor.AddProcess("flyetcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
 
 	sigch := make(chan os.Signal)
@@ -79,8 +77,12 @@ func WaitForMembers(expectedMembers int) error {
 
 			// Protect against duplicate entries.
 			currentMembers := removeDuplicateValues(addrs)
-			if len(currentMembers) >= expectedMembers {
+			if len(currentMembers) == expectedMembers {
 				return nil
+			}
+			if len(currentMembers) > expectedMembers {
+				return fmt.Errorf("member total cannot exceed TARGET_CLUSTER_SIZE.  (expect %d, got: %d )",
+					len(currentMembers), expectedMembers)
 			}
 			time.Sleep(1 * time.Second)
 		}
