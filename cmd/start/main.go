@@ -3,10 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -17,33 +15,29 @@ import (
 
 func main() {
 
-	targetSizeStr := os.Getenv("TARGET_CLUSTER_SIZE")
-	if targetSizeStr == "" {
-		panic(fmt.Errorf("TARGET_CLUSTER_SIZE environment variable required."))
+	fmt.Println("Waiting for network to come up.")
+
+	node, err := flyetcd.NewNode()
+	if err != nil {
+		panic(err)
 	}
 
-	if !flyetcd.Bootstrapped() {
-		// New node setup.
-		targetMembers, err := strconv.Atoi(targetSizeStr)
+	WaitForNetwork(node)
+
+	if !node.IsBootstrapped() {
+		if err := node.Bootstrap(); err != nil {
+			panic(err)
+		}
+	} else {
+		err = node.LoadConfig()
 		if err != nil {
 			panic(err)
 		}
-
-		if err := WaitForMembers(targetMembers); err != nil {
-			panic(err)
-		}
-
-		_, err = flyetcd.NewNode()
-		if err != nil {
-			panic(err)
-		}
-
-		flyetcd.WriteBootstrapLock()
 	}
 
-	// Start main Etcd process.
+	fmt.Printf("DEBUG: Starting member with config : %+v\n", node.Config)
+
 	svisor := supervisor.New("flyetcd", 5*time.Minute)
-
 	svisor.AddProcess("flyetcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
 
 	sigch := make(chan os.Signal)
@@ -59,45 +53,25 @@ func main() {
 
 }
 
-func WaitForMembers(expectedMembers int) error {
-	fmt.Printf("Waiting for all %d nodes to come online. (Timeout: 5 minutes)\n", expectedMembers)
-
+func WaitForNetwork(node *flyetcd.Node) error {
 	timeout := time.After(5 * time.Minute)
 	tick := time.Tick(1 * time.Second)
 	for {
 		select {
 		case <-timeout:
-			return fmt.Errorf("Timed out waiting for my buddies")
+			return fmt.Errorf("Timed out waiting network to become accessible.")
 		case <-tick:
+
 			addrs, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
-			if err != nil {
-				// It can take DNS a little bit to come up.
-				continue
+			if err == nil {
+				for _, addr := range addrs {
+					if addr.IP.String() == node.PrivateIp {
+						return nil
+					}
+				}
 			}
 
-			// Protect against duplicate entries.
-			currentMembers := removeDuplicateValues(addrs)
-			if len(currentMembers) == expectedMembers {
-				return nil
-			}
-			if len(currentMembers) > expectedMembers {
-				return fmt.Errorf("member total cannot exceed TARGET_CLUSTER_SIZE.  (expect %d, got: %d )",
-					len(currentMembers), expectedMembers)
-			}
 			time.Sleep(1 * time.Second)
 		}
 	}
-}
-
-func removeDuplicateValues(addrs []net.IPAddr) []string {
-	keys := make(map[string]bool)
-	list := []string{}
-	for _, addr := range addrs {
-		addrStr := addr.String()
-		if _, value := keys[addrStr]; !value {
-			keys[addrStr] = true
-			list = append(list, addrStr)
-		}
-	}
-	return list
 }
