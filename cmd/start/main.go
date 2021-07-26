@@ -15,16 +15,24 @@ import (
 
 func main() {
 
+	fmt.Println("Waiting for network to come up.")
+
 	node, err := flyetcd.NewNode()
 	if err != nil {
 		panic(err)
 	}
 
+	WaitForNetwork(node)
+
 	if !node.IsBootstrapped() {
 		if err := node.Bootstrap(); err != nil {
 			panic(err)
 		}
-
+	} else {
+		err = node.LoadConfig()
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	fmt.Printf("DEBUG: Starting member with config : %+v\n", node.Config)
@@ -45,7 +53,7 @@ func main() {
 
 }
 
-func WaitForNetwork() error {
+func WaitForNetwork(node *flyetcd.Node) error {
 	timeout := time.After(5 * time.Minute)
 	tick := time.Tick(1 * time.Second)
 	for {
@@ -53,10 +61,16 @@ func WaitForNetwork() error {
 		case <-timeout:
 			return fmt.Errorf("Timed out waiting network to become accessible.")
 		case <-tick:
-			_, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
-			if err != nil {
-				continue
+
+			addrs, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
+			if err == nil {
+				for _, addr := range addrs {
+					if addr.IP.String() == node.PrivateIp {
+						return nil
+					}
+				}
 			}
+
 			time.Sleep(1 * time.Second)
 		}
 	}

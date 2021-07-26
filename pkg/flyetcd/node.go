@@ -84,11 +84,24 @@ func (n *Node) Bootstrap() error {
 		fmt.Printf("DEBUG: Existing cluster detected, adding %s at runtime.\n", n.Config.ListenPeerUrls)
 
 		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
-		_, err = client.MemberAdd(ctx, []string{n.Config.ListenPeerUrls})
+		resp, err := client.MemberAdd(ctx, []string{n.Config.ListenPeerUrls})
 		cancel()
 		if err != nil {
 			return err
 		}
+		var peerUrls []string
+
+		for _, member := range resp.Members {
+			for _, peerUrl := range member.PeerURLs {
+				name := member.Name
+				if member.ID == resp.Member.ID {
+					name = n.Config.Name
+				}
+				peer := fmt.Sprintf("%s=%s", name, peerUrl)
+				peerUrls = append(peerUrls, peer)
+			}
+		}
+		n.Config.InitialCluster = strings.Join(peerUrls, ",")
 	}
 
 	return n.WriteConfig()
@@ -97,8 +110,9 @@ func (n *Node) Bootstrap() error {
 func (n *Node) GenerateConfig() error {
 	peerUrl := fmt.Sprintf("http://[%s]:2380", n.PrivateIp)
 	clientUrl := fmt.Sprintf("http://[%s]:2379", n.PrivateIp)
+	name := getMD5Hash(n.PrivateIp)
 	n.Config = &Config{
-		Name:                     getMD5Hash(n.PrivateIp),
+		Name:                     name,
 		DataDir:                  "/etcd_data",
 		ListenPeerUrls:           peerUrl,
 		AdvertiseClientUrls:      clientUrl,
@@ -110,18 +124,8 @@ func (n *Node) GenerateConfig() error {
 		AutoCompactionRetention:  "1",
 	}
 
-	// Generate initial cluster string
-	addrs, err := privnet.AllPeers(context.TODO(), n.AppName)
-	if err != nil {
-		return err
-	}
-	var members []string
-	for _, addr := range addrs {
-		name := getMD5Hash(addr.String())
-		member := fmt.Sprintf("%s=http://[%s]:2380", name, addr.String())
-		members = append(members, member)
-	}
-	n.Config.InitialCluster = strings.Join(members, ",")
+	peer := fmt.Sprintf("%s=%s", name, peerUrl)
+	n.Config.InitialCluster = peer
 
 	return nil
 }
