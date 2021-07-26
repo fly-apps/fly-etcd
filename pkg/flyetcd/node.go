@@ -13,13 +13,11 @@ import (
 )
 
 const ConfigFilePath = "/etcd_data/etcd.yaml"
-const BootstrapLockFilePath = "/etcd_data/bootstrap.lock"
 
 type Node struct {
-	AppName      string
-	PrivateIp    string
-	Bootstrapped bool
-	Config       *Config
+	AppName   string
+	PrivateIp string
+	Config    *Config
 }
 
 // Example configuration file: https://github.com/etcd-io/etcd/blob/release-3.5/etcd.conf.yml.sample
@@ -43,69 +41,63 @@ func NewNode() (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	node := &Node{
-		AppName:      envOrDefault("FLY_APP_NAME", "local"),
-		PrivateIp:    privateIp.String(),
-		Bootstrapped: Bootstrapped(),
+		AppName:   envOrDefault("FLY_APP_NAME", "local"),
+		PrivateIp: privateIp.String(),
 	}
 
-	client, err := NewClient(node.AppName)
+	return node, nil
+}
+
+func (n *Node) Bootstrap() error {
+	client, err := NewClient(n.AppName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// Check to see if we are able to access the cluster.
-	// If the cluster is accessable we need to verify whether or not
-	// our peerUrl has already been registered.
+	if err := n.GenerateConfig(); err != nil {
+		return err
+	}
+
+	// Verifies that the cluster is up and whether or not we have already been registerd with raft.
 	clusterUp := false
 	memberRegistered := false
-	ctx, cancel := context.WithTimeout(context.TODO(), (5 * time.Second))
+	ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
 	resp, err := client.MemberList(ctx)
 	cancel()
 	if err == nil {
 		clusterUp = true
 		for _, m := range resp.Members {
 			for _, p := range m.PeerURLs {
-				if p == fmt.Sprintf("http://[%s]:2380", node.PrivateIp) {
+				if p == fmt.Sprintf("http://[%s]:2380", n.PrivateIp) {
 					memberRegistered = true
 				}
 			}
 		}
 	}
-
-	fmt.Printf("Cluster up: %t, Member registered: %t\n", clusterUp, memberRegistered)
-	if err := node.GenerateConfig(); err != nil {
-		return nil, err
-	}
+	fmt.Printf("DEBUG: Cluster up: %t, Member registered: %t\n", clusterUp, memberRegistered)
 
 	if clusterUp && !memberRegistered {
+		n.Config.InitialClusterState = "existing"
+
 		// Add at runtime
-		fmt.Printf("Existing cluster detected, adding %s at runtime.\n", node.Config.ListenPeerUrls)
+		fmt.Printf("DEBUG: Existing cluster detected, adding %s at runtime.\n", n.Config.ListenPeerUrls)
 
 		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
-		_, err = client.MemberAdd(ctx, []string{node.Config.ListenPeerUrls})
+		_, err = client.MemberAdd(ctx, []string{n.Config.ListenPeerUrls})
 		cancel()
 		if err != nil {
-			return nil, err
+			return err
 		}
-
-		node.Config.InitialClusterState = "existing"
 	}
 
-	// WARNING: If the cluster isn't accessable, we can't really know the reason for it.
-	// If we have lost quorum or the cluster is heavily loaded this could potentially
-	// add fuel to the fire.
-
-	node.WriteConfig()
-
-	return node, nil
+	return n.WriteConfig()
 }
 
 func (n *Node) GenerateConfig() error {
 	peerUrl := fmt.Sprintf("http://[%s]:2380", n.PrivateIp)
 	clientUrl := fmt.Sprintf("http://[%s]:2379", n.PrivateIp)
-	config := &Config{
+	n.Config = &Config{
 		Name:                     getMD5Hash(n.PrivateIp),
 		DataDir:                  "/etcd_data",
 		ListenPeerUrls:           peerUrl,
@@ -129,9 +121,7 @@ func (n *Node) GenerateConfig() error {
 		member := fmt.Sprintf("%s=http://[%s]:2380", name, addr.String())
 		members = append(members, member)
 	}
-	config.InitialCluster = strings.Join(members, ",")
-
-	n.Config = config
+	n.Config.InitialCluster = strings.Join(members, ",")
 
 	return nil
 }
@@ -154,15 +144,12 @@ func (n *Node) LoadConfig() error {
 	if err != nil {
 		return err
 	}
+	n.Config = c
 	return nil
 }
 
-func WriteBootstrapLock() error {
-	return ioutil.WriteFile(BootstrapLockFilePath, []byte{}, 0700)
-}
-
-func Bootstrapped() bool {
-	if _, err := os.Stat(BootstrapLockFilePath); err != nil {
+func (n *Node) IsBootstrapped() bool {
+	if _, err := os.Stat(ConfigFilePath); err != nil {
 		return false
 	}
 	return true
