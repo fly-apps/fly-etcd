@@ -10,12 +10,16 @@ import (
 
 func main() {
 
-	node, err := flyetcd.NewNode()
+	endpoint, err := flyetcd.CurrentEndpoint()
 	if err != nil {
 		panic(err)
 	}
 
-	ctx := context.TODO()
+	// All check connections will target this node.
+	client, err := flyetcd.NewClient([]string{endpoint.ClientUrl})
+	if err != nil {
+		panic(err)
+	}
 
 	categories := []string{"etcd", "vm"}
 
@@ -28,8 +32,9 @@ func main() {
 
 	for _, category := range categories {
 		switch category {
-		case "pg":
-			passed, failed = CheckEtcd(ctx, node, passed, failed)
+		case "etcd":
+			ctx := context.TODO()
+			passed, failed = CheckEtcd(ctx, client, passed, failed)
 		case "vm":
 			passed, failed = CheckVM(passed, failed)
 		}
