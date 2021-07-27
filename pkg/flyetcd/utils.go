@@ -38,7 +38,7 @@ func ClusterStarted(client *Client, node *Node) (bool, error) {
 			continue
 		}
 		endpoint := fmt.Sprintf("http://[%s]:2379", addr.String())
-		ctx, cancel := context.WithTimeout(context.TODO(), (5 * time.Second))
+		ctx, cancel := context.WithTimeout(context.TODO(), (15 * time.Second))
 		_, err := client.Status(ctx, endpoint)
 		cancel()
 		if err != nil {
