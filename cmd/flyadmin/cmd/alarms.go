@@ -31,7 +31,7 @@ var alarmDisarmCmd = &cobra.Command{
 	Short: "Disarms all alarms",
 	Long:  "Disarms all alarms",
 	Run: func(cmd *cobra.Command, args []string) {
-		client, err := flyetcd.NewClient(AppName())
+		client, err := flyetcd.NewClient([]string{})
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -52,7 +52,7 @@ var alarmListCmd = &cobra.Command{
 	Short: "List all alarms",
 	Long:  "Lists all alarms associated with members of the cluster",
 	Run: func(cmd *cobra.Command, args []string) {
-		client, err := flyetcd.NewClient(AppName())
+		client, err := flyetcd.NewClient([]string{})
 		if err != nil {
 			fmt.Println(err.Error())
 			return

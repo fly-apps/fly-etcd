@@ -9,7 +9,6 @@ import (
 
 	humanize "github.com/dustin/go-humanize"
 	"github.com/fly-examples/fly-etcd/pkg/flyetcd"
-	"github.com/fly-examples/fly-etcd/pkg/privnet"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -40,12 +39,11 @@ var endpointStatusCmd = &cobra.Command{
 	Long:  "Checks the status of the cluster endpoints",
 	Run: func(cmd *cobra.Command, args []string) {
 
-		client, err := flyetcd.NewClient(AppName())
+		client, err := flyetcd.NewClient([]string{})
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
-
 		useDNS, err := cmd.Flags().GetBool("dns")
 		if err != nil {
 			fmt.Println(err.Error())
@@ -54,14 +52,13 @@ var endpointStatusCmd = &cobra.Command{
 
 		var members []string
 		if useDNS {
-			addrs, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
+			endpoints, err := flyetcd.AllEndpoints()
 			if err != nil {
-				fmt.Println("Failed to discover private network. :(")
+				fmt.Println(err.Error())
 				return
 			}
-			for _, addr := range addrs {
-				member := fmt.Sprintf("http://[%s]:2379", addr.String())
-				members = append(members, member)
+			for _, endpoint := range endpoints {
+				members = append(members, endpoint.ClientUrl)
 			}
 		} else {
 			ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
@@ -74,7 +71,6 @@ var endpointStatusCmd = &cobra.Command{
 			for _, member := range resp.Members {
 				members = append(members, member.ClientURLs[0])
 			}
-
 		}
 
 		var statusList []EndpointStatus

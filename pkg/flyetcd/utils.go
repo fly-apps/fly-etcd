@@ -4,11 +4,8 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
-	"fmt"
 	"os"
 	"time"
-
-	"github.com/fly-examples/fly-etcd/pkg/privnet"
 )
 
 func getMD5Hash(str string) string {
@@ -29,17 +26,16 @@ func envOrDefault(name, defaultVal string) string {
 // to see if any of them respond to status. The Status function
 // will return a result regardless of whether the cluster meets quorum or not.
 func ClusterStarted(client *Client, node *Node) (bool, error) {
-	addrs, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
+	endpoints, err := AllEndpoints()
 	if err != nil {
 		return false, err
 	}
-	for _, addr := range addrs {
-		if addr.String() == node.PrivateIp {
+	for _, endpoint := range endpoints {
+		if endpoint.Addr == node.Endpoint.Addr {
 			continue
 		}
-		endpoint := fmt.Sprintf("http://[%s]:2379", addr.String())
 		ctx, cancel := context.WithTimeout(context.TODO(), (15 * time.Second))
-		_, err := client.Status(ctx, endpoint)
+		_, err := client.Status(ctx, endpoint.ClientUrl)
 		cancel()
 		if err != nil {
 			continue

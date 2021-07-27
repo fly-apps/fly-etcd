@@ -3,70 +3,64 @@ package flyetcd
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"strings"
 	"time"
-
-	"github.com/fly-examples/fly-etcd/pkg/privnet"
-	yaml "gopkg.in/yaml.v3"
 )
 
-const ConfigFilePath = "/etcd_data/etcd.yaml"
-
 type Node struct {
-	AppName   string
-	PrivateIp string
-	Config    *Config
-}
-
-// Example configuration file: https://github.com/etcd-io/etcd/blob/release-3.5/etcd.conf.yml.sample
-type Config struct {
-	Name                     string `yaml:"name"`
-	DataDir                  string `yaml:"data-dir"`
-	AdvertiseClientUrls      string `yaml:"advertise-client-urls"`
-	ListenClientUrls         string `yaml:"listen-client-urls"`
-	ListenPeerUrls           string `yaml:"listen-peer-urls"`
-	InitialCluster           string `yaml:"initial-cluster"`
-	InitialClusterToken      string `yaml:"initial-cluster-token"`
-	InitialClusterState      string `yaml:"initial-cluster-state"`
-	InitialAdvertisePeerUrls string `yaml:"initial-advertise-peer-urls"`
-	ForceNewCluster          bool   `yaml:"force-new-cluster"`
-	AutoCompactionMode       string `yaml:"auto-compaction-mode"`
-	AutoCompactionRetention  string `yaml:"auto-compaction-retention"`
+	AppName  string
+	Endpoint *Endpoint
+	Config   *Config
 }
 
 func NewNode() (*Node, error) {
-	privateIp, err := privnet.PrivateIPv6()
+	// Build endpoint
+	endpoint, err := CurrentEndpoint()
 	if err != nil {
 		return nil, err
 	}
-	node := &Node{
-		AppName:   envOrDefault("FLY_APP_NAME", "local"),
-		PrivateIp: privateIp.String(),
+
+	var config *Config
+	if ConfigFilePresent() {
+		// Load configuration file, if present
+		config, err = LoadConfig()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Generate new conifg
+		config = NewConfig(endpoint)
 	}
+
+	node := &Node{
+		AppName:  envOrDefault("FLY_APP_NAME", "local"),
+		Endpoint: endpoint,
+		Config:   config,
+	}
+
+	fmt.Printf("Node config: %+v", node.Config)
 	return node, nil
 }
 
 func (n *Node) Bootstrap() error {
-	client, err := NewClient(n.AppName)
+	// Initialize client using the default uri.
+	client, err := NewClient([]string{})
 	if err != nil {
 		return err
 	}
 
-	if err := n.GenerateConfig(); err != nil {
-		return err
-	}
-
+	// Check to see if the cluster has been started.
+	// TODO - Known race condition here. Need to come up with a better process
+	// for identifying whether a cluster is active or not.
 	started, err := ClusterStarted(client, n)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("DEBUG: Cluster bootstrap status: %t", started)
+	fmt.Printf("DEBUG: Cluster bootstrap status: %t\n", started)
 	if started {
 		ctx, cancel := context.WithTimeout(context.TODO(), (5 * time.Second))
-		resp, err := client.MemberAdd(ctx, []string{n.Config.ListenPeerUrls})
+		resp, err := client.MemberAdd(ctx, []string{n.Endpoint.PeerUrl})
 		cancel()
 		if err != nil {
 			return err
@@ -77,7 +71,7 @@ func (n *Node) Bootstrap() error {
 			for _, peerUrl := range member.PeerURLs {
 				name := member.Name
 				if member.ID == resp.Member.ID {
-					name = n.Config.Name
+					name = n.Endpoint.Name
 				}
 				peer := fmt.Sprintf("%s=%s", name, peerUrl)
 				peerUrls = append(peerUrls, peer)
@@ -87,54 +81,5 @@ func (n *Node) Bootstrap() error {
 		n.Config.InitialClusterState = "existing"
 	}
 
-	return n.WriteConfig()
-}
-
-func (n *Node) GenerateConfig() error {
-	peerUrl := fmt.Sprintf("http://[%s]:2380", n.PrivateIp)
-	clientUrl := fmt.Sprintf("http://[%s]:2379", n.PrivateIp)
-	name := getMD5Hash(n.PrivateIp)
-	n.Config = &Config{
-		Name:                     name,
-		DataDir:                  "/etcd_data",
-		ListenPeerUrls:           peerUrl,
-		AdvertiseClientUrls:      clientUrl,
-		ListenClientUrls:         "http://0.0.0.0:2379",
-		InitialAdvertisePeerUrls: peerUrl,
-		InitialCluster:           fmt.Sprintf("%s=%s", name, peerUrl),
-		InitialClusterState:      "new",
-		InitialClusterToken:      getMD5Hash(n.AppName),
-		AutoCompactionMode:       "periodic",
-		AutoCompactionRetention:  "1",
-	}
-	return nil
-}
-
-func (n *Node) WriteConfig() error {
-	data, err := yaml.Marshal(n.Config)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(ConfigFilePath, data, 0700)
-}
-
-func (n *Node) IsBootstrapped() bool {
-	if _, err := os.Stat(ConfigFilePath); err != nil {
-		return false
-	}
-	return true
-}
-
-func (n *Node) LoadConfig() error {
-	c := n.Config
-	yamlFile, err := ioutil.ReadFile(ConfigFilePath)
-	if err != nil {
-		return err
-	}
-	err = yaml.Unmarshal(yamlFile, &c)
-	if err != nil {
-		return err
-	}
-	n.Config = c
-	return nil
+	return WriteConfig(n.Config)
 }

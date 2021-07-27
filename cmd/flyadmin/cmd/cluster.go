@@ -22,10 +22,9 @@ var forceNewClusterCmd = &cobra.Command{
 			fmt.Println(err.Error())
 			return
 		}
-		node.LoadConfig()
 		node.Config.ForceNewCluster = true
 		node.Config.InitialCluster = node.Config.InitialAdvertisePeerUrls
-		node.WriteConfig()
+		flyetcd.WriteConfig(node.Config)
 	},
 }
 
@@ -39,9 +38,7 @@ var resetForceNewClusterFlagCmd = &cobra.Command{
 			fmt.Println(err.Error())
 			return
 		}
-
-		node.LoadConfig()
 		node.Config.ForceNewCluster = false
-		node.WriteConfig()
+		flyetcd.WriteConfig(node.Config)
 	},
 }

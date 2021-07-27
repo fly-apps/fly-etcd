@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -9,7 +8,6 @@ import (
 	"time"
 
 	"github.com/fly-examples/fly-etcd/pkg/flyetcd"
-	"github.com/fly-examples/fly-etcd/pkg/privnet"
 	"github.com/fly-examples/fly-etcd/pkg/supervisor"
 )
 
@@ -23,7 +21,7 @@ func main() {
 	fmt.Println("Waiting for network to come up.")
 	WaitForNetwork(node)
 
-	if !node.IsBootstrapped() {
+	if !flyetcd.ConfigFilePresent() {
 		if err := node.Bootstrap(); err != nil {
 			PanicHandler(err)
 		}
@@ -52,10 +50,10 @@ func WaitForNetwork(node *flyetcd.Node) error {
 		case <-timeout:
 			return fmt.Errorf("Timed out waiting network to become accessible.")
 		case <-tick:
-			addrs, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
+			endpoints, err := flyetcd.AllEndpoints()
 			if err == nil {
-				for _, addr := range addrs {
-					if addr.IP.String() == node.PrivateIp {
+				for _, endpoint := range endpoints {
+					if endpoint.Addr == node.Endpoint.Addr {
 						return nil
 					}
 				}

@@ -21,11 +21,15 @@ type Client struct {
 	*client.Client
 }
 
-func NewClient(appName string) (*Client, error) {
-	endpoint := fmt.Sprintf("http://%s.internal:2379", appName)
+func NewClient(endpoints []string) (*Client, error) {
+
+	// If no endpoints are specified use our internal uri.
+	if len(endpoints) == 0 {
+		endpoints = []string{fmt.Sprintf("http://%s.internal:2379", os.Getenv("FLY_APP_NAME"))}
+	}
 
 	config := client.Config{
-		Endpoints:         []string{endpoint},
+		Endpoints:         endpoints,
 		DialTimeout:       10 * time.Second,
 		DialKeepAliveTime: 1 * time.Second,
 	}

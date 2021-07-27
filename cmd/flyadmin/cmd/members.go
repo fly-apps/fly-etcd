@@ -32,7 +32,7 @@ var memberRemoveCmd = &cobra.Command{
 	Long:  "Remove member from cluster",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		client, err := flyetcd.NewClient(AppName())
+		client, err := flyetcd.NewClient([]string{})
 		if err != nil {
 			fmt.Println(err.Error())
 			return
@@ -58,12 +58,11 @@ var membersListCmd = &cobra.Command{
 	Short: "List all members",
 	Long:  "Lists all the Etcd members in the cluster",
 	Run: func(cmd *cobra.Command, args []string) {
-		client, err := flyetcd.NewClient(AppName())
+		client, err := flyetcd.NewClient([]string{})
 		if err != nil {
 			fmt.Println(err.Error())
 			return
 		}
-
 		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
 		resp, err := client.MemberList(ctx)
 		cancel()
