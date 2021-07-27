@@ -37,7 +37,6 @@ var memberRemoveCmd = &cobra.Command{
 			fmt.Println(err.Error())
 			return
 		}
-
 		id := args[0]
 		i64, err := strconv.ParseUint(id, 16, 64)
 		if err != nil {
@@ -50,7 +49,6 @@ var memberRemoveCmd = &cobra.Command{
 			fmt.Println(err.Error())
 			return
 		}
-
 		printMembersTable(resp.Members)
 	},
 }

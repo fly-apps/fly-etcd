@@ -22,11 +22,10 @@ var forceNewClusterCmd = &cobra.Command{
 			fmt.Println(err.Error())
 			return
 		}
-
 		node.LoadConfig()
 		node.Config.ForceNewCluster = true
+		node.Config.InitialCluster = node.Config.InitialAdvertisePeerUrls
 		node.WriteConfig()
-
 	},
 }
 

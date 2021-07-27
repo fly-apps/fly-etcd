@@ -17,7 +17,7 @@ func main() {
 
 	node, err := flyetcd.NewNode()
 	if err != nil {
-		panic(err)
+		PanicHandler(err)
 	}
 
 	fmt.Println("Waiting for network to come up.")
@@ -25,7 +25,7 @@ func main() {
 
 	if !node.IsBootstrapped() {
 		if err := node.Bootstrap(); err != nil {
-			panic(err)
+			PanicHandler(err)
 		}
 	}
 
@@ -63,4 +63,13 @@ func WaitForNetwork(node *flyetcd.Node) error {
 			time.Sleep(1 * time.Second)
 		}
 	}
+}
+
+func PanicHandler(err error) {
+	debug := os.Getenv("DEBUG")
+	if debug != "" {
+		fmt.Println("Entering debug mode... (Timeout: 10 minutes")
+		time.Sleep(time.Minute * 10)
+	}
+	panic(err)
 }

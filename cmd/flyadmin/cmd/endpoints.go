@@ -19,6 +19,7 @@ func init() {
 	rootCmd.AddCommand(endpointsCmd)
 	// endpointsCmd.AddCommand(endpointsHealthCmd)
 	endpointsCmd.AddCommand(endpointStatusCmd)
+	endpointStatusCmd.PersistentFlags().Bool("dns", false, "use DNS to resolve member list.")
 }
 
 var endpointsCmd = &cobra.Command{
@@ -44,16 +45,40 @@ var endpointStatusCmd = &cobra.Command{
 			fmt.Println(err.Error())
 			return
 		}
-		// We are using network discovery as MemberList will not return if
-		// there's a loss in quorum.
-		addrs, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
+
+		useDNS, err := cmd.Flags().GetBool("dns")
 		if err != nil {
-			fmt.Println("Failed to discover private network. :(")
+			fmt.Println(err.Error())
 			return
 		}
+
+		var members []string
+		if useDNS {
+			addrs, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
+			if err != nil {
+				fmt.Println("Failed to discover private network. :(")
+				return
+			}
+			for _, addr := range addrs {
+				member := fmt.Sprintf("http://[%s]:2379", addr.String())
+				members = append(members, member)
+			}
+		} else {
+			ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
+			resp, err := client.MemberList(ctx)
+			cancel()
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+			for _, member := range resp.Members {
+				members = append(members, member.ClientURLs[0])
+			}
+
+		}
+
 		var statusList []EndpointStatus
-		for _, addr := range addrs {
-			member := fmt.Sprintf("http://[%s]:2379", addr.String())
+		for _, member := range members {
 			ctx, cancel := context.WithTimeout(context.TODO(), (5 * time.Second))
 			resp, err := client.Status(ctx, member)
 			cancel()
