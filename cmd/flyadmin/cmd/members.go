@@ -21,7 +21,7 @@ func init() {
 }
 
 var membersCmd = &cobra.Command{
-	Use:   "members",
+	Use:   "member",
 	Short: "Manage Etcd members",
 	Long:  `Manage Etcd cluster members`,
 }

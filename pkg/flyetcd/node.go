@@ -125,16 +125,16 @@ func (n *Node) IsBootstrapped() bool {
 	return true
 }
 
-// func (n *Node) LoadConfig() error {
-// 	c := n.Config
-// 	yamlFile, err := ioutil.ReadFile(ConfigFilePath)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	err = yaml.Unmarshal(yamlFile, &c)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	n.Config = c
-// 	return nil
-// }
+func (n *Node) LoadConfig() error {
+	c := n.Config
+	yamlFile, err := ioutil.ReadFile(ConfigFilePath)
+	if err != nil {
+		return err
+	}
+	err = yaml.Unmarshal(yamlFile, &c)
+	if err != nil {
+		return err
+	}
+	n.Config = c
+	return nil
+}

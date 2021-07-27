@@ -22,7 +22,7 @@ func init() {
 }
 
 var endpointsCmd = &cobra.Command{
-	Use:   "endpoints",
+	Use:   "endpoint",
 	Short: "Etcd endpoint related commands",
 	Long:  `Etcd endpoint related commands`,
 }
@@ -44,13 +44,13 @@ var endpointStatusCmd = &cobra.Command{
 			fmt.Println(err.Error())
 			return
 		}
-
+		// We are using network discovery as MemberList will not return if
+		// there's a loss in quorum.
 		addrs, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
 		if err != nil {
 			fmt.Println("Failed to discover private network. :(")
 			return
 		}
-
 		var statusList []EndpointStatus
 		for _, addr := range addrs {
 			member := fmt.Sprintf("http://[%s]:2379", addr.String())
