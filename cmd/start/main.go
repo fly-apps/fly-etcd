@@ -15,27 +15,19 @@ import (
 
 func main() {
 
-	fmt.Println("Waiting for network to come up.")
-
 	node, err := flyetcd.NewNode()
 	if err != nil {
 		panic(err)
 	}
 
+	fmt.Println("Waiting for network to come up.")
 	WaitForNetwork(node)
 
 	if !node.IsBootstrapped() {
 		if err := node.Bootstrap(); err != nil {
 			panic(err)
 		}
-	} else {
-		err = node.LoadConfig()
-		if err != nil {
-			panic(err)
-		}
 	}
-
-	fmt.Printf("DEBUG: Starting member with config : %+v\n", node.Config)
 
 	svisor := supervisor.New("flyetcd", 5*time.Minute)
 	svisor.AddProcess("flyetcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
@@ -50,7 +42,6 @@ func main() {
 	}()
 
 	svisor.Run()
-
 }
 
 func WaitForNetwork(node *flyetcd.Node) error {
@@ -61,7 +52,6 @@ func WaitForNetwork(node *flyetcd.Node) error {
 		case <-timeout:
 			return fmt.Errorf("Timed out waiting network to become accessible.")
 		case <-tick:
-
 			addrs, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
 			if err == nil {
 				for _, addr := range addrs {
@@ -70,7 +60,6 @@ func WaitForNetwork(node *flyetcd.Node) error {
 					}
 				}
 			}
-
 			time.Sleep(1 * time.Second)
 		}
 	}

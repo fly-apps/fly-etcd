@@ -13,7 +13,7 @@ import (
 // CheckVM for system / disk checks
 func CheckVM(passed []string, failed []error) ([]string, []error) {
 
-	msg, err := checkDisk("/data/")
+	msg, err := checkDisk("/etcd_data/")
 	if err != nil {
 		failed = append(failed, err)
 	} else {

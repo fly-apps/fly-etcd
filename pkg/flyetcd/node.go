@@ -45,7 +45,6 @@ func NewNode() (*Node, error) {
 		AppName:   envOrDefault("FLY_APP_NAME", "local"),
 		PrivateIp: privateIp.String(),
 	}
-
 	return node, nil
 }
 
@@ -59,38 +58,21 @@ func (n *Node) Bootstrap() error {
 		return err
 	}
 
-	// Verifies that the cluster is up and whether or not we have already been registerd with raft.
-	clusterUp := false
-	memberRegistered := false
-	ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
-	resp, err := client.MemberList(ctx)
-	cancel()
-	if err == nil {
-		clusterUp = true
-		for _, m := range resp.Members {
-			for _, p := range m.PeerURLs {
-				if p == fmt.Sprintf("http://[%s]:2380", n.PrivateIp) {
-					memberRegistered = true
-				}
-			}
-		}
+	started, err := ClusterStarted(client, n)
+	if err != nil {
+		return err
 	}
-	fmt.Printf("DEBUG: Cluster up: %t, Member registered: %t\n", clusterUp, memberRegistered)
 
-	if clusterUp && !memberRegistered {
-		n.Config.InitialClusterState = "existing"
-
-		// Add at runtime
-		fmt.Printf("DEBUG: Existing cluster detected, adding %s at runtime.\n", n.Config.ListenPeerUrls)
-
-		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
+	fmt.Printf("DEBUG: Cluster bootstrap status: %t", started)
+	if started {
+		ctx, cancel := context.WithTimeout(context.TODO(), (5 * time.Second))
 		resp, err := client.MemberAdd(ctx, []string{n.Config.ListenPeerUrls})
 		cancel()
 		if err != nil {
 			return err
 		}
+		// Evaluate the response and build our initial cluster string.
 		var peerUrls []string
-
 		for _, member := range resp.Members {
 			for _, peerUrl := range member.PeerURLs {
 				name := member.Name
@@ -102,6 +84,7 @@ func (n *Node) Bootstrap() error {
 			}
 		}
 		n.Config.InitialCluster = strings.Join(peerUrls, ",")
+		n.Config.InitialClusterState = "existing"
 	}
 
 	return n.WriteConfig()
@@ -118,15 +101,12 @@ func (n *Node) GenerateConfig() error {
 		AdvertiseClientUrls:      clientUrl,
 		ListenClientUrls:         "http://0.0.0.0:2379",
 		InitialAdvertisePeerUrls: peerUrl,
+		InitialCluster:           fmt.Sprintf("%s=%s", name, peerUrl),
 		InitialClusterState:      "new",
 		InitialClusterToken:      getMD5Hash(n.AppName),
 		AutoCompactionMode:       "periodic",
 		AutoCompactionRetention:  "1",
 	}
-
-	peer := fmt.Sprintf("%s=%s", name, peerUrl)
-	n.Config.InitialCluster = peer
-
 	return nil
 }
 
@@ -138,23 +118,23 @@ func (n *Node) WriteConfig() error {
 	return ioutil.WriteFile(ConfigFilePath, data, 0700)
 }
 
-func (n *Node) LoadConfig() error {
-	c := n.Config
-	yamlFile, err := ioutil.ReadFile(ConfigFilePath)
-	if err != nil {
-		return err
-	}
-	err = yaml.Unmarshal(yamlFile, &c)
-	if err != nil {
-		return err
-	}
-	n.Config = c
-	return nil
-}
-
 func (n *Node) IsBootstrapped() bool {
 	if _, err := os.Stat(ConfigFilePath); err != nil {
 		return false
 	}
 	return true
 }
+
+// func (n *Node) LoadConfig() error {
+// 	c := n.Config
+// 	yamlFile, err := ioutil.ReadFile(ConfigFilePath)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	err = yaml.Unmarshal(yamlFile, &c)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	n.Config = c
+// 	return nil
+// }
