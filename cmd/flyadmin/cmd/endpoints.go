@@ -44,6 +44,7 @@ var endpointStatusCmd = &cobra.Command{
 			fmt.Println(err.Error())
 			return
 		}
+
 		addrs, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
 		if err != nil {
 			fmt.Println("Failed to discover private network. :(")
@@ -52,7 +53,7 @@ var endpointStatusCmd = &cobra.Command{
 
 		var statusList []EndpointStatus
 		for _, addr := range addrs {
-			member := addr.String()
+			member := fmt.Sprintf("http://[%s]:2379", addr.String())
 			ctx, cancel := context.WithTimeout(context.TODO(), (5 * time.Second))
 			resp, err := client.Status(ctx, member)
 			cancel()
