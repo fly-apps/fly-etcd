@@ -10,20 +10,44 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 func init() {
 	rootCmd.AddCommand(alarmsCmd)
-	alarmsCmd.AddCommand(alarmsListCmd)
+	alarmsCmd.AddCommand(alarmListCmd)
+	alarmsCmd.AddCommand(alarmDisarmCmd)
+
 }
 
 var alarmsCmd = &cobra.Command{
-	Use:   "alarms",
+	Use:   "alarm",
 	Short: "Manage Etcd alarms",
 	Long:  `Manage Etcd cluster alarms`,
 }
 
-var alarmsListCmd = &cobra.Command{
+var alarmDisarmCmd = &cobra.Command{
+	Use:   "disarm",
+	Short: "Disarms all alarms",
+	Long:  "Disarms all alarms",
+	Run: func(cmd *cobra.Command, args []string) {
+		client, err := flyetcd.NewClient(AppName())
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
+		resp, err := client.AlarmDisarm(ctx, &clientv3.AlarmMember{})
+		cancel()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		printAlarmsTable(resp.Alarms)
+	},
+}
+
+var alarmListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all alarms",
 	Long:  "Lists all alarms associated with members of the cluster",
@@ -40,7 +64,6 @@ var alarmsListCmd = &cobra.Command{
 			fmt.Println(err.Error())
 			return
 		}
-
 		printAlarmsTable(resp.Alarms)
 	},
 }
