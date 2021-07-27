@@ -24,12 +24,14 @@ Add the following to your generated `fly.toml` file.
 
 ## Deploying a single node cluster
 
-Create a new volume named `etcd_data`.
+**Create a new volume named `etcd_data`**
+
 ```
 fly volumes create etcd_data --region ord --size 10
 ```
 
-Deploy your app.
+**Deploy your app**
+
 ```
 fly deploy .
 ```
@@ -57,9 +59,14 @@ fly scale count 2
 fly scale count 3
 ```
 
+## Administration
+
+
+
+
 
 ## Monitoring
 
-## Administration
+
 
 ## Recovering from Quorum loss
