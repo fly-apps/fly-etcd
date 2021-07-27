@@ -4,23 +4,33 @@ Etcd deployment built to run on Fly.
 
 ## Preparing your app
 
-Initialize a new Fly app.
+**Initialize a new Fly App**
 
-_Note: Specify 2379 as the internal port._ 
+_Note: Client requests should be directed to port 2379._ 
 
 ```
 fly init
 ```
 
+**Configure your app to use Volumes**
+
+Add the following to your generated `fly.toml` file.
+```toml
+[mounts]
+  source="etcd_data"
+  destination="/etcd_data"
+``` 
+
 
 ## Deploying a single node cluster
 
-
+Create a new volume named `etcd_data`.
 ```
-# Creates new volume named etcd_data. ( Required )
 fly volumes create etcd_data --region ord --size 10
+```
 
-# Deploy your app.
+Deploy your app.
+```
 fly deploy .
 ```
 
@@ -40,9 +50,10 @@ $ fly volumes create etcd_data --region ewr --size 10
 
 When scaling, make sure you monitor your logs for errors and ensure your cluster is healthy before performing any subsequent scaling operations.  Newly added members are considered for quorum even if the member is not reachable from other existing members.
 
-```bash
+```
 fly scale count 2
-
+```
+```
 fly scale count 3
 ```
 
