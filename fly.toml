@@ -1,42 +1,54 @@
-# fly.toml file generated for still-star-2028 on 2021-07-21T23:13:53-05:00
+# fly.toml file generated for lively-lake-2200 on 2021-07-27T17:28:38-05:00
 
-app = "still-star-2028"
+app = "lively-lake-2200"
 
 kill_signal = "SIGINT"
 kill_timeout = 5
 
-[checks]
+[mounts]
+  source="etcd_data"
+  destination="/etcd_data"
 
-  [checks.role]
-    args = ["vm"]
-    command = "flycheck"
-    interval = 60000
-    restart_limit = 0
-    timeout = 10000
-    type = "script"
+[checks.pg]
+type         = "script"
+interval     = 30000
+timeout      = 10000
+grace_period = "10s"
+command      = "flycheck"
+args         = [ "etcd" ]
+restart_limit = 0
+
+[checks.vm]
+type     = "script"
+interval = 30000
+timeout  = 10000
+command  = "flycheck"
+args     = [ "vm" ]
+restart_limit = 0
 
 [env]
-  TARGET_CLUSTER_SIZE = 3 
+  DEBUG = true
 
 [experimental]
   allowed_public_ports = []
-  auto_rollback = false
-
-[[mounts]]
-  destination = "/etcd_data"
-  source = "etcd_data"
+  auto_rollback = true
 
 [[services]]
+  http_checks = []
   internal_port = 2379
+  protocol = "tcp"
+  script_checks = []
 
   [services.concurrency]
+    hard_limit = 25
+    soft_limit = 20
+    type = "connections"
 
   [[services.ports]]
-    handlers = []
-    port = 10000
+    handlers = ["http"]
+    port = 80
 
-  [[services.tcp_checks]]
-    grace_period = "1s"
-    interval = "15s"
-    restart_limit = 6
-    timeout = "2s"
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
