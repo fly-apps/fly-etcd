@@ -9,7 +9,7 @@ kill_timeout = 5
   source="etcd_data"
   destination="/etcd_data"
 
-[checks.pg]
+[checks.etcd]
 type         = "script"
 interval     = 30000
 timeout      = 10000
@@ -27,7 +27,6 @@ args     = [ "vm" ]
 restart_limit = 0
 
 [env]
-  DEBUG = true
 
 [experimental]
   allowed_public_ports = []
