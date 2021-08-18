@@ -34,7 +34,7 @@ func ClusterStarted(client *Client, node *Node) (bool, error) {
 		if endpoint.Addr == node.Endpoint.Addr {
 			continue
 		}
-		ctx, cancel := context.WithTimeout(context.TODO(), (15 * time.Second))
+		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
 		_, err := client.Status(ctx, endpoint.ClientUrl)
 		cancel()
 		if err != nil {
