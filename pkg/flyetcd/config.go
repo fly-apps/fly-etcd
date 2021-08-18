@@ -78,7 +78,7 @@ func (c *Config) SetAuthToken() error {
 		return err
 	}
 
-	c.AuthToken = fmt.Sprintf("jwt,pub-key=%s,priv-key=%s,sign-method=%s",
+	c.AuthToken = fmt.Sprintf("jwt,pub-key=%s,priv-key=%s,sign-method=%s,ttl=1h",
 		pubCertPath,
 		privCertPath,
 		signMethod,
