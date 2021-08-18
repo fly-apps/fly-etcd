@@ -50,31 +50,33 @@ func NewConfig(endpoint *Endpoint) *Config {
 }
 
 func (c *Config) SetAuthToken() error {
-
-	if isJWTAuthEnabled() {
-		dir := filepath.Join(JWTCertPath, "certs")
-		err := os.Mkdir(dir, 0700)
-		if err != nil {
-			if !os.IsExist(err) {
-				return err
-			}
-		}
-
-		pubCert := os.Getenv("ETCD_JWT_PUB")
-		pubCertPath := filepath.Join(dir, "jwt_token.pub")
-
-		privCert := os.Getenv("ETCD_JWT_SECRET")
-		privCertPath := filepath.Join(dir, "jwt_token")
-
-		if err := ioutil.WriteFile(privCertPath, []byte(privCert), 0644); err != nil {
-			return err
-		}
-		if err := ioutil.WriteFile(pubCertPath, []byte(pubCert), 0644); err != nil {
-			return err
-		}
-
-		c.AuthToken = fmt.Sprintf("jwt,pub-key=%s,priv-key=%s,sign-method=RS256", pubCertPath, privCertPath)
+	if !isJWTAuthEnabled() {
+		c.AuthToken = "simple"
+		return nil
 	}
+
+	dir := filepath.Join(JWTCertPath, "certs")
+	err := os.Mkdir(dir, 0700)
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+
+	pubCert := os.Getenv("ETCD_JWT_PUB")
+	pubCertPath := filepath.Join(dir, "jwt_token.pub")
+
+	privCert := os.Getenv("ETCD_JWT_SECRET")
+	privCertPath := filepath.Join(dir, "jwt_token")
+
+	if err := ioutil.WriteFile(privCertPath, []byte(privCert), 0644); err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(pubCertPath, []byte(pubCert), 0644); err != nil {
+		return err
+	}
+
+	c.AuthToken = fmt.Sprintf("jwt,pub-key=%s,priv-key=%s,sign-method=RS256", pubCertPath, privCertPath)
 
 	return nil
 }
