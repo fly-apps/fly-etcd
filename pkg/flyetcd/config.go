@@ -10,7 +10,7 @@ import (
 )
 
 const ConfigFilePath = "/etcd_data/etcd.yaml"
-const JWTCertPath = "/etcd_data/"
+const JWTCertPath = "/etcd_data"
 
 // Example configuration file: https://github.com/etcd-io/etcd/blob/release-3.5/etcd.conf.yml.sample
 type Config struct {
@@ -52,7 +52,7 @@ func NewConfig(endpoint *Endpoint) *Config {
 func (c *Config) SetAuthToken() error {
 
 	if isJWTAuthEnabled() {
-		dir := filepath.Join("/etcd_data", "certs")
+		dir := filepath.Join(JWTCertPath, "certs")
 		err := os.Mkdir(dir, 0700)
 		if err != nil {
 			if !os.IsExist(err) {
