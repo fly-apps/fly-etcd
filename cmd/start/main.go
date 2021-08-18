@@ -31,9 +31,6 @@ func main() {
 			PanicHandler(err)
 		}
 	}
-
-	fmt.Printf("AUTH TOKEN: %s\n", node.Config.AuthToken)
-
 	svisor := supervisor.New("flyetcd", 5*time.Minute)
 	svisor.AddProcess("flyetcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
 
