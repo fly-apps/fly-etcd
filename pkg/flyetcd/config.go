@@ -63,11 +63,13 @@ func (c *Config) SetAuthToken() error {
 		}
 	}
 
-	pubCert := os.Getenv("ETCD_JWT_PUB")
+	pubCert := os.Getenv("ETCD_JWT_PUBLIC")
 	pubCertPath := filepath.Join(dir, "jwt_token.pub")
 
-	privCert := os.Getenv("ETCD_JWT_SECRET")
+	privCert := os.Getenv("ETCD_JWT_PRIVATE")
 	privCertPath := filepath.Join(dir, "jwt_token")
+
+	signMethod := os.Getenv("ETCD_JWT_SIGN_METHOD")
 
 	if err := ioutil.WriteFile(privCertPath, []byte(privCert), 0644); err != nil {
 		return err
@@ -76,7 +78,11 @@ func (c *Config) SetAuthToken() error {
 		return err
 	}
 
-	c.AuthToken = fmt.Sprintf("jwt,pub-key=%s,priv-key=%s,sign-method=RS256", pubCertPath, privCertPath)
+	c.AuthToken = fmt.Sprintf("jwt,pub-key=%s,priv-key=%s,sign-method=%s",
+		pubCertPath,
+		privCertPath,
+		signMethod,
+	)
 
 	return nil
 }
@@ -111,11 +117,15 @@ func ConfigFilePresent() bool {
 }
 
 func isJWTAuthEnabled() bool {
-	if os.Getenv("ETCD_JWT_SECRET") == "" {
+	if os.Getenv("ETCD_JWT_PRIVATE") == "" {
 		return false
 	}
-	if os.Getenv("ETCD_JWT_PUB") == "" {
+	if os.Getenv("ETCD_JWT_PUBLIC") == "" {
 		return false
 	}
+	if os.Getenv("ETCD_JWT_SIGN_METHOD") == "" {
+		return false
+	}
+
 	return true
 }
