@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	yaml "gopkg.in/yaml.v3"
 )
 
 const ConfigFilePath = "/etcd_data/etcd.yaml"
+const JWTCertPath = "/etcd_data/"
 
 // Example configuration file: https://github.com/etcd-io/etcd/blob/release-3.5/etcd.conf.yml.sample
 type Config struct {
@@ -24,10 +26,11 @@ type Config struct {
 	ForceNewCluster          bool   `yaml:"force-new-cluster"`
 	AutoCompactionMode       string `yaml:"auto-compaction-mode"`
 	AutoCompactionRetention  string `yaml:"auto-compaction-retention"`
+	AuthToken                string `yaml:"auth-token"`
 }
 
 func NewConfig(endpoint *Endpoint) *Config {
-	return &Config{
+	cfg := &Config{
 		Name:                     endpoint.Name,
 		ListenPeerUrls:           endpoint.PeerUrl,
 		AdvertiseClientUrls:      endpoint.ClientUrl,
@@ -39,7 +42,41 @@ func NewConfig(endpoint *Endpoint) *Config {
 		InitialClusterState:      "new",
 		AutoCompactionMode:       "periodic",
 		AutoCompactionRetention:  "1",
+		AuthToken:                "",
 	}
+	cfg.SetAuthToken()
+
+	return cfg
+}
+
+func (c *Config) SetAuthToken() error {
+
+	if isJWTAuthEnabled() {
+		dir := filepath.Join("/etcd_data", "certs")
+		err := os.Mkdir(dir, 0700)
+		if err != nil {
+			if !os.IsExist(err) {
+				return err
+			}
+		}
+
+		pubCert := os.Getenv("ETCD_JWT_PUB")
+		pubCertPath := filepath.Join(dir, "jwt_token.pub")
+
+		privCert := os.Getenv("ETCD_JWT_SECRET")
+		privCertPath := filepath.Join(dir, "jwt_token")
+
+		if err := ioutil.WriteFile(privCertPath, []byte(privCert), 0644); err != nil {
+			return err
+		}
+		if err := ioutil.WriteFile(pubCertPath, []byte(pubCert), 0644); err != nil {
+			return err
+		}
+
+		c.AuthToken = fmt.Sprintf("jwt,pub-key=%s,priv-key=%s,sign-method=RS256", pubCertPath, privCertPath)
+	}
+
+	return nil
 }
 
 func WriteConfig(c *Config) error {
@@ -66,6 +103,16 @@ func LoadConfig() (*Config, error) {
 
 func ConfigFilePresent() bool {
 	if _, err := os.Stat(ConfigFilePath); err != nil {
+		return false
+	}
+	return true
+}
+
+func isJWTAuthEnabled() bool {
+	if os.Getenv("ETCD_JWT_SECRET") == "" {
+		return false
+	}
+	if os.Getenv("ETCD_JWT_PUB") == "" {
 		return false
 	}
 	return true

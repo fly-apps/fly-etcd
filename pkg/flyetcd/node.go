@@ -27,6 +27,7 @@ func NewNode() (*Node, error) {
 		if err != nil {
 			return nil, err
 		}
+
 	} else {
 		// Generate new conifg
 		config = NewConfig(endpoint)
@@ -38,7 +39,6 @@ func NewNode() (*Node, error) {
 		Config:   config,
 	}
 
-	fmt.Printf("Node config: %+v", node.Config)
 	return node, nil
 }
 
@@ -57,7 +57,6 @@ func (n *Node) Bootstrap() error {
 		return err
 	}
 
-	fmt.Printf("DEBUG: Cluster bootstrap status: %t\n", started)
 	if started {
 		ctx, cancel := context.WithTimeout(context.TODO(), (5 * time.Second))
 		resp, err := client.MemberAdd(ctx, []string{n.Endpoint.PeerUrl})

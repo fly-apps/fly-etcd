@@ -21,7 +21,12 @@ func main() {
 	fmt.Println("Waiting for network to come up.")
 	WaitForNetwork(node)
 
-	if !flyetcd.ConfigFilePresent() {
+	if flyetcd.ConfigFilePresent() {
+		if err := node.Config.SetAuthToken(); err != nil {
+			PanicHandler(err)
+		}
+		flyetcd.WriteConfig(node.Config)
+	} else {
 		if err := node.Bootstrap(); err != nil {
 			PanicHandler(err)
 		}
@@ -66,6 +71,7 @@ func WaitForNetwork(node *flyetcd.Node) error {
 func PanicHandler(err error) {
 	debug := os.Getenv("DEBUG")
 	if debug != "" {
+		fmt.Println(err.Error())
 		fmt.Println("Entering debug mode... (Timeout: 10 minutes")
 		time.Sleep(time.Minute * 10)
 	}
