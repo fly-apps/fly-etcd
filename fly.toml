@@ -46,6 +46,11 @@ kill_timeout = 30
     handlers = []
     port = 10000
 
+  [[services.ports]]
+    handlers  = ["tls"]
+    port = 443
+    tls_options = { alpn = ["h2"] }
+
   [services.concurrency]
     hard_limit = 1000
     soft_limit = 300
