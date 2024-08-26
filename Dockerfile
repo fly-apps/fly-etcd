@@ -1,6 +1,6 @@
 FROM golang:1.16
 
-ENV ETCD_VER=v3.5.0
+ENV ETCD_VER=v3.5.15
 ENV DOWNLOAD_URL=https://github.com/etcd-io/etcd/releases/download
 
 WORKDIR /go/src/github.com/fly-examples/fly-etcd
