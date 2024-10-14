@@ -42,9 +42,9 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            flyio/etcd:3
-            flyio/etcd:3.5
-            flyio/etcd:3.5.16
+            flyio/fly-etcd:3
+            flyio/fly-etcd:3.5
+            flyio/fly-etcd:3.5.16
       -
         name: Etcd Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
