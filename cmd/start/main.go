@@ -18,13 +18,17 @@ func main() {
 	}
 
 	fmt.Println("Waiting for network to come up.")
-	WaitForNetwork(node)
+	if err := WaitForNetwork(node); err != nil {
+		PanicHandler(err)
+	}
 
 	if flyetcd.ConfigFilePresent() {
 		if err := node.Config.SetAuthToken(); err != nil {
 			PanicHandler(err)
 		}
-		flyetcd.WriteConfig(node.Config)
+		if err := flyetcd.WriteConfig(node.Config); err != nil {
+			PanicHandler(err)
+		}
 	} else {
 		if err := node.Bootstrap(); err != nil {
 			PanicHandler(err)
