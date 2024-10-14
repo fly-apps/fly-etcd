@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/signal"
 	"syscall"
 	"time"
 
@@ -36,16 +35,10 @@ func main() {
 
 	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
 
-	sigch := make(chan os.Signal)
-	signal.Notify(sigch, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		<-sigch
-		fmt.Println("Got interrupt, stopping")
-		svisor.Stop()
-	}()
-
-	svisor.Run()
+	if err := svisor.Run(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
 
 func WaitForNetwork(node *flyetcd.Node) error {
