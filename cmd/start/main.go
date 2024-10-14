@@ -14,28 +14,28 @@ func main() {
 
 	node, err := flyetcd.NewNode()
 	if err != nil {
-		PanicHandler(err)
+		panicHandler(err)
 	}
 
 	fmt.Println("Waiting for network to come up.")
-	if err := WaitForNetwork(node); err != nil {
-		PanicHandler(err)
+	if err := waitForNetwork(node); err != nil {
+		panicHandler(err)
 	}
 
 	if flyetcd.ConfigFilePresent() {
 		if err := node.Config.SetAuthToken(); err != nil {
-			PanicHandler(err)
+			panicHandler(err)
 		}
 		if err := flyetcd.WriteConfig(node.Config); err != nil {
-			PanicHandler(err)
+			panicHandler(err)
 		}
 	} else {
 		if err := node.Bootstrap(); err != nil {
-			PanicHandler(err)
+			panicHandler(err)
 		}
 	}
-	svisor := supervisor.New("flyetcd", 5*time.Minute)
-	svisor.AddProcess("flyetcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
+	svisor := supervisor.New("fly-etcd", 5*time.Minute)
+	svisor.AddProcess("fly-etcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
 
 	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
 
@@ -45,7 +45,7 @@ func main() {
 	}
 }
 
-func WaitForNetwork(node *flyetcd.Node) error {
+func waitForNetwork(node *flyetcd.Node) error {
 	timeout := time.After(5 * time.Minute)
 	tick := time.Tick(1 * time.Second)
 	for {
@@ -66,7 +66,7 @@ func WaitForNetwork(node *flyetcd.Node) error {
 	}
 }
 
-func PanicHandler(err error) {
+func panicHandler(err error) {
 	debug := os.Getenv("DEBUG")
 	if debug != "" {
 		fmt.Println(err.Error())

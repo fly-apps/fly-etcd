@@ -26,6 +26,10 @@ type Config struct {
 	AutoCompactionMode       string `yaml:"auto-compaction-mode"`
 	AutoCompactionRetention  string `yaml:"auto-compaction-retention"`
 	AuthToken                string `yaml:"auth-token"`
+
+	MaxSnapshots  int `yaml:"max-snapshots"`
+	MaxWals       int `yaml:"max-wals"`
+	SnapshotCount int `yaml:"snapshot-count"`
 }
 
 func NewConfig(endpoint *Endpoint) (*Config, error) {
@@ -42,6 +46,9 @@ func NewConfig(endpoint *Endpoint) (*Config, error) {
 		AutoCompactionMode:       "periodic",
 		AutoCompactionRetention:  "1",
 		AuthToken:                "",
+		MaxSnapshots:             5,     // Default
+		MaxWals:                  5,     // Default
+		SnapshotCount:            10000, // Default
 	}
 
 	if err := cfg.SetAuthToken(); err != nil {
