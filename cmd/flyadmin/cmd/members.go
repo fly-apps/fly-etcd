@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fly-examples/fly-etcd/pkg/flyetcd"
+	"github.com/fly-examples/fly-etcd/internal/flyetcd"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"go.etcd.io/etcd/api/v3/etcdserverpb"

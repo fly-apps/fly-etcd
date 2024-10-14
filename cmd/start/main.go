@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fly-examples/fly-etcd/pkg/flyetcd"
-	"github.com/fly-examples/fly-etcd/pkg/supervisor"
+	"github.com/fly-examples/fly-etcd/internal/flyetcd"
+	"github.com/fly-examples/fly-etcd/internal/supervisor"
 )
 
 func main() {
@@ -34,6 +34,8 @@ func main() {
 	svisor := supervisor.New("flyetcd", 5*time.Minute)
 	svisor.AddProcess("flyetcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
 
+	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
+
 	sigch := make(chan os.Signal)
 	signal.Notify(sigch, syscall.SIGINT, syscall.SIGTERM)
 
@@ -52,7 +54,7 @@ func WaitForNetwork(node *flyetcd.Node) error {
 	for {
 		select {
 		case <-timeout:
-			return fmt.Errorf("Timed out waiting network to become accessible.")
+			return fmt.Errorf("timed out waiting network to become accessible")
 		case <-tick:
 			endpoints, err := flyetcd.AllEndpoints()
 			if err == nil {
