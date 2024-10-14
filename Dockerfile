@@ -5,7 +5,7 @@ ARG FLY_VERSION=custom
 
 ENV DOWNLOAD_URL=https://github.com/etcd-io/etcd/releases/download
 
-WORKDIR /go/src/github.com/fly-examples/fly-etcd
+WORKDIR /go/src/github.com/fly-apps/fly-etcd
 
 COPY . .
 

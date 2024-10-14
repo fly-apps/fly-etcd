@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fly-examples/fly-etcd/pkg/flyetcd"
+	"github.com/fly-apps/fly-etcd/internal/flyetcd"
 )
 
 func CheckEtcd(ctx context.Context, client *flyetcd.Client, passed []string, failed []error) ([]string, []error) {

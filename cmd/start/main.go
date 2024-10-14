@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fly-examples/fly-etcd/internal/flyetcd"
-	"github.com/fly-examples/fly-etcd/internal/supervisor"
+	"github.com/fly-apps/fly-etcd/internal/flyetcd"
+	"github.com/fly-apps/fly-etcd/internal/supervisor"
 )
 
 func main() {

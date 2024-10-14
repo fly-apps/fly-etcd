@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fly-examples/fly-etcd/cmd/flyadmin/cmd"
+	"github.com/fly-apps/fly-etcd/cmd/flyadmin/cmd"
 )
 
 func main() {

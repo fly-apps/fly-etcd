@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/fly-examples/fly-etcd/internal/flyetcd"
+	"github.com/fly-apps/fly-etcd/internal/flyetcd"
 	"github.com/spf13/cobra"
 )
 
