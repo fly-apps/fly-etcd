@@ -4,13 +4,17 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fly-examples/fly-etcd/cmd/flyadmin/cmd"
+	"github.com/fly-apps/fly-etcd/cmd/flyadmin/cmd"
 )
 
 func main() {
 	appName := os.Getenv("FLY_APP_NAME")
 	if appName == "" {
-		panic(fmt.Errorf("FLY_APP_NAME environment variable required."))
+		panic(fmt.Errorf("FLY_APP_NAME environment variable required"))
 	}
-	cmd.Execute()
+
+	if err := cmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }

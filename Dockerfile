@@ -1,9 +1,11 @@
-FROM golang:1.16
+FROM golang:1.22
 
-ENV ETCD_VER=v3.5.15
+ENV ETCD_VERSION=v3.5.16
+ARG FLY_VERSION=custom
+
 ENV DOWNLOAD_URL=https://github.com/etcd-io/etcd/releases/download
 
-WORKDIR /go/src/github.com/fly-examples/fly-etcd
+WORKDIR /go/src/github.com/fly-apps/fly-etcd
 
 COPY . .
 
@@ -15,6 +17,13 @@ RUN curl -L ${DOWNLOAD_URL}/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz -o /
  && tar xzvf /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz -C /usr/local/bin --strip-components=1
 
 FROM alpine:3.3
+
+ARG FLY_VERSION
+ARG ETCD_VERSION
+
+LABEL fly.app_role=etcd_cluster
+LABEL fly.version=${FLY_VERSION}
+LABEL fly.etcd-version=${ETCD_VERSION}
 
 RUN apk add --update curl bash && \
    rm -rf /var/cache/apk/*

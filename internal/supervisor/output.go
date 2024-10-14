@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"sync"
-	"syscall"
 
 	"github.com/pkg/term/termios"
 )
@@ -29,10 +29,11 @@ func (m *multiOutput) openPipe(proc *process) (pipe *ptyPipe) {
 	pipe.pty, pipe.tty, err = termios.Pty()
 	fatalOnErr(err)
 
-	proc.Stdout = pipe.tty
-	proc.Stderr = pipe.tty
-	proc.Stdin = pipe.tty
-	proc.SysProcAttr = &syscall.SysProcAttr{Setctty: true, Setsid: true}
+	proc.cmd.Stdout = pipe.tty
+	proc.cmd.Stderr = pipe.tty
+	proc.cmd.Stdin = pipe.tty
+	proc.cmd.SysProcAttr.Setctty = true
+	proc.cmd.SysProcAttr.Setsid = true
 
 	return
 }
@@ -63,8 +64,8 @@ func (m *multiOutput) PipeOutput(proc *process) {
 
 func (m *multiOutput) ClosePipe(proc *process) {
 	if pipe := m.pipes[proc]; pipe != nil {
-		pipe.pty.Close()
-		pipe.tty.Close()
+		_ = pipe.pty.Close()
+		_ = pipe.tty.Close()
 	}
 }
 
@@ -88,7 +89,10 @@ func (m *multiOutput) WriteLine(proc *process, p []byte) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	buf.WriteTo(os.Stdout)
+	_, err := buf.WriteTo(os.Stdout)
+	if err != nil {
+		log.Printf("failed to write to stdout: %s", err)
+	}
 }
 
 func (m *multiOutput) WriteErr(proc *process, err error) {

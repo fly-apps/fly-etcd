@@ -8,7 +8,7 @@ import (
 	"time"
 
 	humanize "github.com/dustin/go-humanize"
-	"github.com/fly-examples/fly-etcd/pkg/flyetcd"
+	"github.com/fly-apps/fly-etcd/internal/flyetcd"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	clientv3 "go.etcd.io/etcd/client/v3"

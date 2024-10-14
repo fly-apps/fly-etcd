@@ -2,7 +2,6 @@ package flyetcd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -29,7 +28,7 @@ type Config struct {
 	AuthToken                string `yaml:"auth-token"`
 }
 
-func NewConfig(endpoint *Endpoint) *Config {
+func NewConfig(endpoint *Endpoint) (*Config, error) {
 	cfg := &Config{
 		Name:                     endpoint.Name,
 		ListenPeerUrls:           endpoint.PeerUrl,
@@ -44,9 +43,12 @@ func NewConfig(endpoint *Endpoint) *Config {
 		AutoCompactionRetention:  "1",
 		AuthToken:                "",
 	}
-	cfg.SetAuthToken()
 
-	return cfg
+	if err := cfg.SetAuthToken(); err != nil {
+		return nil, fmt.Errorf("failed to set auth token: %w", err)
+	}
+
+	return cfg, nil
 }
 
 func (c *Config) SetAuthToken() error {
@@ -56,8 +58,7 @@ func (c *Config) SetAuthToken() error {
 	}
 
 	dir := filepath.Join(JWTCertPath, "certs")
-	err := os.Mkdir(dir, 0700)
-	if err != nil {
+	if err := os.Mkdir(dir, 0700); err != nil {
 		if !os.IsExist(err) {
 			return err
 		}
@@ -71,10 +72,10 @@ func (c *Config) SetAuthToken() error {
 
 	signMethod := os.Getenv("ETCD_JWT_SIGN_METHOD")
 
-	if err := ioutil.WriteFile(privCertPath, []byte(privCert), 0644); err != nil {
+	if err := os.WriteFile(privCertPath, []byte(privCert), 0644); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(pubCertPath, []byte(pubCert), 0644); err != nil {
+	if err := os.WriteFile(pubCertPath, []byte(pubCert), 0644); err != nil {
 		return err
 	}
 
@@ -92,12 +93,12 @@ func WriteConfig(c *Config) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(ConfigFilePath, data, 0700)
+	return os.WriteFile(ConfigFilePath, data, 0700)
 }
 
 func LoadConfig() (*Config, error) {
 	var config Config
-	yamlFile, err := ioutil.ReadFile(ConfigFilePath)
+	yamlFile, err := os.ReadFile(ConfigFilePath)
 	if err != nil {
 		return nil, err
 	}

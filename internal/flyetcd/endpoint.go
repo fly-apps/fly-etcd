@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fly-examples/fly-etcd/pkg/privnet"
+	"github.com/fly-apps/fly-etcd/internal/privnet"
 )
 
 type Endpoint struct {

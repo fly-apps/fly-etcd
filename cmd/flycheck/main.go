@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fly-examples/fly-etcd/pkg/flyetcd"
+	"github.com/fly-apps/fly-etcd/internal/flyetcd"
 )
 
 func main() {

@@ -3,12 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/fly-examples/fly-etcd/pkg/flyetcd"
-	"github.com/fly-examples/fly-etcd/pkg/supervisor"
+	"github.com/fly-apps/fly-etcd/internal/flyetcd"
+	"github.com/fly-apps/fly-etcd/internal/supervisor"
 )
 
 func main() {
@@ -19,13 +18,17 @@ func main() {
 	}
 
 	fmt.Println("Waiting for network to come up.")
-	WaitForNetwork(node)
+	if err := WaitForNetwork(node); err != nil {
+		PanicHandler(err)
+	}
 
 	if flyetcd.ConfigFilePresent() {
 		if err := node.Config.SetAuthToken(); err != nil {
 			PanicHandler(err)
 		}
-		flyetcd.WriteConfig(node.Config)
+		if err := flyetcd.WriteConfig(node.Config); err != nil {
+			PanicHandler(err)
+		}
 	} else {
 		if err := node.Bootstrap(); err != nil {
 			PanicHandler(err)
@@ -34,16 +37,12 @@ func main() {
 	svisor := supervisor.New("flyetcd", 5*time.Minute)
 	svisor.AddProcess("flyetcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
 
-	sigch := make(chan os.Signal)
-	signal.Notify(sigch, syscall.SIGINT, syscall.SIGTERM)
+	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
-		<-sigch
-		fmt.Println("Got interrupt, stopping")
-		svisor.Stop()
-	}()
-
-	svisor.Run()
+	if err := svisor.Run(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
 
 func WaitForNetwork(node *flyetcd.Node) error {
@@ -52,7 +51,7 @@ func WaitForNetwork(node *flyetcd.Node) error {
 	for {
 		select {
 		case <-timeout:
-			return fmt.Errorf("Timed out waiting network to become accessible.")
+			return fmt.Errorf("timed out waiting network to become accessible")
 		case <-tick:
 			endpoints, err := flyetcd.AllEndpoints()
 			if err == nil {

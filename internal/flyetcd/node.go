@@ -30,7 +30,10 @@ func NewNode() (*Node, error) {
 
 	} else {
 		// Generate new conifg
-		config = NewConfig(endpoint)
+		config, err = NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	node := &Node{

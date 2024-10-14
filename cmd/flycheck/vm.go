@@ -3,8 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
+	"os"
 	"runtime"
 	"strconv"
 	"syscall"
@@ -45,7 +45,7 @@ func checkPressure(name string) (string, error) {
 	var avg10, avg60, avg300, counter float64
 	//var rest string
 
-	raw, err := ioutil.ReadFile("/proc/pressure/" + name)
+	raw, err := os.ReadFile("/proc/pressure/" + name)
 	if err != nil {
 		return "", err
 	}
@@ -78,8 +78,7 @@ func checkPressure(name string) (string, error) {
 func checkLoad() (string, error) {
 	var loadAverage1, loadAverage5, loadAverage10 float64
 	var runningProcesses, totalProcesses, lastProcessID int
-	raw, err := ioutil.ReadFile("/proc/loadavg")
-
+	raw, err := os.ReadFile("/proc/loadavg")
 	if err != nil {
 		return "", err
 	}
