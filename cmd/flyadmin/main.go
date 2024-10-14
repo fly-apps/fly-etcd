@@ -12,5 +12,9 @@ func main() {
 	if appName == "" {
 		panic(fmt.Errorf("FLY_APP_NAME environment variable required"))
 	}
-	cmd.Execute()
+
+	if err := cmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 }
