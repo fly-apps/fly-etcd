@@ -36,6 +36,7 @@ func main() {
 	}
 	svisor := supervisor.New("fly-etcd", 5*time.Minute)
 	svisor.AddProcess("fly-etcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
+	svisor.AddProcess("admin", "/usr/local/bin/start-api")
 
 	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
 

@@ -1,4 +1,4 @@
-package main
+package flycheck
 
 import (
 	"context"
@@ -7,25 +7,29 @@ import (
 	"time"
 
 	"github.com/fly-apps/fly-etcd/internal/flyetcd"
+	"github.com/superfly/fly-checks/check"
 )
 
-func CheckEtcd(ctx context.Context, client *flyetcd.Client, passed []string, failed []error) ([]string, []error) {
-
-	msg, err := checkAlarms(ctx, client)
+func checkEtcd(ctx context.Context, checks *check.CheckSuite) (*check.CheckSuite, error) {
+	client, err := flyetcd.NewClient([]string{})
 	if err != nil {
-		failed = append(failed, err)
-	} else {
-		passed = append(passed, msg)
+		return checks, fmt.Errorf("failed to create etcd client: %w", err)
 	}
 
-	msg, err = checkConnectivity(ctx, client)
-	if err != nil {
-		failed = append(failed, err)
-	} else {
-		passed = append(passed, msg)
+	// cleanup connection
+	checks.OnCompletion = func() {
+		_ = client.Close()
 	}
 
-	return passed, failed
+	checks.AddCheck("etcd-alarms", func() (string, error) {
+		return checkAlarms(ctx, client)
+	})
+
+	checks.AddCheck("etcd-connectivity", func() (string, error) {
+		return checkConnectivity(ctx, client)
+	})
+
+	return checks, nil
 }
 
 func checkAlarms(ctx context.Context, client *flyetcd.Client) (string, error) {
