@@ -8,8 +8,8 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-const ConfigFilePath = "/etcd_data/etcd.yaml"
-const JWTCertPath = "/etcd_data"
+const ConfigFilePath = "/data/etcd.yaml"
+const JWTCertPath = "/data"
 
 // Example configuration file: https://github.com/etcd-io/etcd/blob/release-3.5/etcd.conf.yml.sample
 type Config struct {
@@ -37,8 +37,8 @@ func NewConfig(endpoint *Endpoint) (*Config, error) {
 		Name:                     endpoint.Name,
 		ListenPeerUrls:           endpoint.PeerUrl,
 		AdvertiseClientUrls:      endpoint.ClientUrl,
-		DataDir:                  "/etcd_data",
-		ListenClientUrls:         "http://0.0.0.0:2379",
+		DataDir:                  "/data",
+		ListenClientUrls:         "http://[::]:2379",
 		InitialAdvertisePeerUrls: endpoint.PeerUrl,
 		InitialCluster:           fmt.Sprintf("%s=%s", endpoint.Name, endpoint.PeerUrl),
 		InitialClusterToken:      getMD5Hash(os.Getenv("FLY_APP_NAME")),
@@ -46,8 +46,8 @@ func NewConfig(endpoint *Endpoint) (*Config, error) {
 		AutoCompactionMode:       "periodic",
 		AutoCompactionRetention:  "1",
 		AuthToken:                "",
-		MaxSnapshots:             5,     // Default
-		MaxWals:                  5,     // Default
+		MaxSnapshots:             10,
+		MaxWals:                  10,
 		SnapshotCount:            10000, // Default
 	}
 
