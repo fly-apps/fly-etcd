@@ -15,15 +15,12 @@ import (
 
 // CheckVM for system / disk checks
 func checkVM(_ context.Context, checks *check.CheckSuite) (*check.CheckSuite, error) {
-
 	checks.AddCheck("disk", func() (string, error) {
 		return checkDisk("/etcd_data/")
 	})
-
 	checks.AddCheck("load", func() (string, error) {
 		return checkLoad()
 	})
-
 	checks.AddCheck("pressure", func() (string, error) {
 		return checkPressure("memory")
 	})
