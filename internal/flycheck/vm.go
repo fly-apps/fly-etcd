@@ -1,6 +1,7 @@
-package main
+package flycheck
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -8,42 +9,29 @@ import (
 	"runtime"
 	"strconv"
 	"syscall"
+
+	"github.com/superfly/fly-checks/check"
 )
 
 // CheckVM for system / disk checks
-func CheckVM(passed []string, failed []error) ([]string, []error) {
+func checkVM(_ context.Context, checks *check.CheckSuite) (*check.CheckSuite, error) {
+	checks.AddCheck("disk", func() (string, error) {
+		return checkDisk("/etcd_data/")
+	})
+	checks.AddCheck("load", func() (string, error) {
+		return checkLoad()
+	})
+	checks.AddCheck("pressure", func() (string, error) {
+		return checkPressure("memory")
+	})
 
-	msg, err := checkDisk("/etcd_data/")
-	if err != nil {
-		failed = append(failed, err)
-	} else {
-		passed = append(passed, msg)
-	}
-
-	msg, err = checkLoad()
-	if err != nil {
-		failed = append(failed, err)
-	} else {
-		passed = append(passed, msg)
-	}
-
-	pressureNames := []string{"memory", "cpu", "io"}
-
-	for _, name := range pressureNames {
-		msg, err = checkPressure(name)
-		if err != nil {
-			failed = append(failed, err)
-		} else {
-			passed = append(passed, msg)
-		}
-	}
-
-	return passed, failed
+	return checks, nil
 }
 
+// checkPressure is an informational check that reports on the system's pressure
+// It will only return an error if we can't read the pressure file.
 func checkPressure(name string) (string, error) {
 	var avg10, avg60, avg300, counter float64
-	//var rest string
 
 	raw, err := os.ReadFile("/proc/pressure/" + name)
 	if err != nil {
@@ -61,20 +49,21 @@ func checkPressure(name string) (string, error) {
 	}
 
 	if avg10 > 5 {
-		return "", fmt.Errorf("system spent %.1f of the last 10 seconds waiting for %s", avg10, name)
+		return fmt.Sprintf("system spent %.1f of the last 10 seconds waiting for %s", avg10, name), nil
 	}
 
 	if avg60 > 10 {
-		return "", fmt.Errorf("system spent %.1f of the last 60 seconds waiting for %s", avg60, name)
+		return fmt.Sprintf("system spent %.1f of the last 60 seconds waiting for %s", avg60, name), nil
 	}
 
 	if avg300 > 50 {
-		return "", fmt.Errorf("system spent %.1f of the last 300 seconds waiting for %s", avg300, name)
+		return fmt.Sprintf("system spent %.1f of the last 300 seconds waiting for %s", avg300, name), nil
 	}
 
 	return fmt.Sprintf("%s: %.1fs waiting over the last 60s", name, avg60), nil
 }
 
+// checkLoad is an informational check that reports on the system's load averages
 func checkLoad() (string, error) {
 	var loadAverage1, loadAverage5, loadAverage10 float64
 	var runningProcesses, totalProcesses, lastProcessID int
@@ -93,18 +82,19 @@ func checkLoad() (string, error) {
 	}
 
 	if loadAverage1/cpus > 10 {
-		return "", fmt.Errorf("1 minute load average is very high: %.2f", loadAverage1)
+		return fmt.Sprintf("1 minute load average is very high: %.2f", loadAverage1), nil
 	}
 	if loadAverage5/cpus > 4 {
-		return "", fmt.Errorf("5 minute load average is high: %.2f", loadAverage5)
+		return fmt.Sprintf("5 minute load average is high: %.2f", loadAverage5), nil
 	}
 	if loadAverage10/cpus > 2 {
-		return "", fmt.Errorf("10 minute load average is high: %.2f", loadAverage10)
+		return fmt.Sprintf("10 minute load average is high: %.2f", loadAverage10), nil
 	}
 
 	return fmt.Sprintf("load averages: %.2f %.2f %.2f", loadAverage10, loadAverage5, loadAverage1), nil
 }
 
+// checkDisk is a failure check that reports on the disk space available
 func checkDisk(dir string) (string, error) {
 	var stat syscall.Statfs_t
 

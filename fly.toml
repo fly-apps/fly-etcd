@@ -1,64 +1,62 @@
-# fly.toml file generated for lively-lake-2200 on 2021-07-27T17:28:38-05:00
+# fly.toml app configuration file generated for shaun-etcd-test on 2024-10-14T16:06:44-05:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "fly-etcd-na"
-
-kill_signal = "SIGTERM"
-kill_timeout = 30
-
-[metrics]
-  port = 2379
-  path = "/metrics"
-
-[mounts]
-  source="etcd_data"
-  destination="/etcd_data"
-
-[checks.etcd]
-  type         = "script"
-  interval     = 30000
-  timeout      = 10000
-  grace_period = "10s"
-  command      = "flycheck"
-  args         = [ "etcd" ]
-  restart_limit = 0
-
-[checks.vm]
-  type     = "script"
-  interval = 30000
-  timeout  = 10000
-  command  = "flycheck"
-  args     = [ "vm" ]
-  restart_limit = 0
-
-[env]
+app = 'shaun-etcd-test'
+kill_signal = 'SIGTERM'
+kill_timeout = '30s'
 
 [experimental]
-  allowed_public_ports = []
   auto_rollback = true
 
+[[mounts]]
+  source = 'etcd_data'
+  destination = '/etcd_data'
+
+[checks]
+  [checks.etcd]
+    grace_period = "30s"
+    interval = "15s"
+    method = "get"
+    path = "/flycheck/etcd"
+    port = 5500
+    timeout = "10s"
+    type = "http"
+
+  [checks.vm]
+    grace_period = "1s"
+    interval = "1m"
+    method = "get"
+    path = "/flycheck/vm"
+    port = 5500
+    timeout = "10s"
+    type = "http"
+
 [[services]]
-  http_checks = []
+  protocol = 'tcp'
   internal_port = 2379
-  protocol = "tcp"
-  script_checks = []
+  auto_start_machines = false
 
   [[services.ports]]
-    handlers = []
     port = 10000
 
   [[services.ports]]
-    handlers  = ["tls"]
     port = 443
-    tls_options = { alpn = ["h2"] }
+    handlers = ['tls']
+
+    [services.ports.tls_options]
+      alpn = ['h2']
 
   [services.concurrency]
+    type = 'connections'
     hard_limit = 1000
     soft_limit = 300
-    type = "connections"
 
+  [[services.tcp_checks]]
+    interval = '10s'
+    timeout = '2s'
 
- [[services.tcp_checks]]
-    grace_period = "40"
-    interval = "10s"
-    restart_limit = 0
-    timeout = "2s"
+[[metrics]]
+  port = 2379
+  path = '/metrics'
