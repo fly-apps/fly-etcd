@@ -9,31 +9,7 @@ Etcd deployment built to run on Fly.
 _Note: Client requests should be directed to port 2379._ 
 
 ```
-fly init
-```
-
-**Configure your app to use Volumes**
-
-Add the following to your generated `fly.toml` file.
-```toml
-[mounts]
-  source="etcd_data"
-  destination="/etcd_data"
-``` 
-
-
-## Deploying a single node cluster
-
-**Create a new volume named `etcd_data`**
-
-```
-fly volumes create etcd_data --region ord --size 10
-```
-
-**Deploy your app**
-
-```
-fly deploy .
+fly launch
 ```
 
 ## Horizontal scaling
@@ -60,8 +36,6 @@ fly scale count 3
 ```
 
 ## Administration
-
-
 
 
 
