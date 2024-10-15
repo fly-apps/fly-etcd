@@ -22,7 +22,6 @@ func NewNode() (*Node, error) {
 
 	var config *Config
 	if ConfigFilePresent() {
-		// Load configuration file, if present
 		config, err = LoadConfig()
 		if err != nil {
 			return nil, err
