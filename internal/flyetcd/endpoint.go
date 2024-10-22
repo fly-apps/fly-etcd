@@ -11,29 +11,29 @@ import (
 type Endpoint struct {
 	Name      string
 	Addr      string
-	ClientUrl string
-	PeerUrl   string
+	ClientURL string
+	PeerURL   string
 }
 
 func NewEndpoint(addr string) *Endpoint {
 	return &Endpoint{
 		Name:      getMD5Hash(addr),
 		Addr:      addr,
-		ClientUrl: fmt.Sprintf("http://[%s]:2379", addr),
-		PeerUrl:   fmt.Sprintf("http://[%s]:2380", addr),
+		ClientURL: fmt.Sprintf("http://[%s]:2379", addr),
+		PeerURL:   fmt.Sprintf("http://[%s]:2380", addr),
 	}
 }
 
-func CurrentEndpoint() (*Endpoint, error) {
-	privateIp, err := privnet.PrivateIPv6()
+func currentEndpoint() (*Endpoint, error) {
+	privateIP, err := privnet.PrivateIPv6()
 	if err != nil {
 		return nil, err
 	}
-	return NewEndpoint(privateIp.String()), nil
+	return NewEndpoint(privateIP.String()), nil
 }
 
-func AllEndpoints() ([]*Endpoint, error) {
-	addrs, err := privnet.AllPeers(context.TODO(), os.Getenv("FLY_APP_NAME"))
+func AllEndpoints(ctx context.Context) ([]*Endpoint, error) {
+	addrs, err := privnet.AllPeers(ctx, os.Getenv("FLY_APP_NAME"))
 	if err != nil {
 		return nil, err
 	}

@@ -8,8 +8,10 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-const ConfigFilePath = "/data/etcd.yaml"
-const JWTCertPath = "/data"
+const (
+	dataDir        = "/data"
+	ConfigFilePath = "/data/etcd.yaml"
+)
 
 // Example configuration file: https://github.com/etcd-io/etcd/blob/release-3.5/etcd.conf.yml.sample
 type Config struct {
@@ -35,12 +37,12 @@ type Config struct {
 func NewConfig(endpoint *Endpoint) (*Config, error) {
 	cfg := &Config{
 		Name:                     endpoint.Name,
-		ListenPeerUrls:           endpoint.PeerUrl,
-		AdvertiseClientUrls:      endpoint.ClientUrl,
-		DataDir:                  "/data",
+		ListenPeerUrls:           endpoint.PeerURL,
+		AdvertiseClientUrls:      endpoint.ClientURL,
+		DataDir:                  dataDir,
 		ListenClientUrls:         "http://[::]:2379",
-		InitialAdvertisePeerUrls: endpoint.PeerUrl,
-		InitialCluster:           fmt.Sprintf("%s=%s", endpoint.Name, endpoint.PeerUrl),
+		InitialAdvertisePeerUrls: endpoint.PeerURL,
+		InitialCluster:           fmt.Sprintf("%s=%s", endpoint.Name, endpoint.PeerURL),
 		InitialClusterToken:      getMD5Hash(os.Getenv("FLY_APP_NAME")),
 		InitialClusterState:      "new",
 		AutoCompactionMode:       "periodic",
@@ -64,26 +66,25 @@ func (c *Config) SetAuthToken() error {
 		return nil
 	}
 
-	dir := filepath.Join(JWTCertPath, "certs")
+	dir := filepath.Join(c.DataDir, "certs")
 	if err := os.Mkdir(dir, 0700); err != nil {
 		if !os.IsExist(err) {
-			return err
+			return fmt.Errorf("failed to create jwt cert directory: %w", err)
 		}
 	}
 
 	pubCert := os.Getenv("ETCD_JWT_PUBLIC")
-	pubCertPath := filepath.Join(dir, "jwt_token.pub")
-
 	privCert := os.Getenv("ETCD_JWT_PRIVATE")
-	privCertPath := filepath.Join(dir, "jwt_token")
-
 	signMethod := os.Getenv("ETCD_JWT_SIGN_METHOD")
 
+	pubCertPath := filepath.Join(dir, "jwt_token.pub")
+	privCertPath := filepath.Join(dir, "jwt_token")
+
 	if err := os.WriteFile(privCertPath, []byte(privCert), 0644); err != nil {
-		return err
+		return fmt.Errorf("failed to write private key: %w", err)
 	}
 	if err := os.WriteFile(pubCertPath, []byte(pubCert), 0644); err != nil {
-		return err
+		return fmt.Errorf("failed to write public key: %w", err)
 	}
 
 	c.AuthToken = fmt.Sprintf("jwt,pub-key=%s,priv-key=%s,sign-method=%s",

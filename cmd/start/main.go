@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"syscall"
@@ -11,6 +12,7 @@ import (
 )
 
 func main() {
+	ctx := context.Background()
 
 	node, err := flyetcd.NewNode()
 	if err != nil {
@@ -18,7 +20,7 @@ func main() {
 	}
 
 	fmt.Println("Waiting for network to come up.")
-	if err := waitForNetwork(node); err != nil {
+	if err := waitForNetwork(ctx, node); err != nil {
 		panicHandler(err)
 	}
 
@@ -30,7 +32,7 @@ func main() {
 			panicHandler(err)
 		}
 	} else {
-		if err := node.Bootstrap(); err != nil {
+		if err := node.Bootstrap(ctx); err != nil {
 			panicHandler(err)
 		}
 	}
@@ -46,7 +48,7 @@ func main() {
 	}
 }
 
-func waitForNetwork(node *flyetcd.Node) error {
+func waitForNetwork(ctx context.Context, node *flyetcd.Node) error {
 	timeout := time.After(5 * time.Minute)
 	tick := time.Tick(1 * time.Second)
 	for {
@@ -54,7 +56,7 @@ func waitForNetwork(node *flyetcd.Node) error {
 		case <-timeout:
 			return fmt.Errorf("timed out waiting network to become accessible")
 		case <-tick:
-			endpoints, err := flyetcd.AllEndpoints()
+			endpoints, err := flyetcd.AllEndpoints(ctx)
 			if err == nil {
 				for _, endpoint := range endpoints {
 					if endpoint.Addr == node.Endpoint.Addr {
