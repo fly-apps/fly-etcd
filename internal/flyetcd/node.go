@@ -14,15 +14,14 @@ type Node struct {
 }
 
 func NewNode() (*Node, error) {
-	// Build endpoint
-	endpoint, err := CurrentEndpoint()
+	endpoint, err := currentEndpoint()
 	if err != nil {
 		return nil, err
 	}
 
 	var config *Config
 	if ConfigFilePresent() {
-		config, err = LoadConfig()
+		config, err = loadConfig()
 		if err != nil {
 			return nil, err
 		}
@@ -44,37 +43,39 @@ func NewNode() (*Node, error) {
 	return node, nil
 }
 
-func (n *Node) Bootstrap() error {
+func (n *Node) Bootstrap(ctx context.Context) error {
 	// Initialize client using the default uri.
 	client, err := NewClient([]string{})
 	if err != nil {
 		return err
 	}
 
-	// Check to see if the cluster has been started.
 	// TODO - Known race condition here. Need to come up with a better process
 	// for identifying whether a cluster is active or not.
-	started, err := ClusterStarted(client, n)
+	// Check to see if the cluster has been initialized.
+	clusterReady, err := clusterInitialized(ctx, client, n)
 	if err != nil {
 		return err
 	}
 
-	if started {
-		ctx, cancel := context.WithTimeout(context.TODO(), (5 * time.Second))
-		resp, err := client.MemberAdd(ctx, []string{n.Endpoint.PeerUrl})
+	// If the cluster is ready, add the node to the cluster.
+	if clusterReady {
+		mCtx, cancel := context.WithTimeout(ctx, (5 * time.Second))
+		resp, err := client.MemberAdd(mCtx, []string{n.Endpoint.PeerURL})
 		cancel()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to add member to cluster: %w", err)
 		}
+
 		// Evaluate the response and build our initial cluster string.
 		var peerUrls []string
 		for _, member := range resp.Members {
-			for _, peerUrl := range member.PeerURLs {
+			for _, peerURL := range member.PeerURLs {
 				name := member.Name
 				if member.ID == resp.Member.ID {
 					name = n.Endpoint.Name
 				}
-				peer := fmt.Sprintf("%s=%s", name, peerUrl)
+				peer := fmt.Sprintf("%s=%s", name, peerURL)
 				peerUrls = append(peerUrls, peer)
 			}
 		}
@@ -83,4 +84,28 @@ func (n *Node) Bootstrap() error {
 	}
 
 	return WriteConfig(n.Config)
+}
+
+// clusterInitialized will check-in with the the other nodes in the network
+// to see if any of them respond to status. The Status function
+// will return a result regardless of whether the cluster meets quorum or not.
+func clusterInitialized(ctx context.Context, client *Client, node *Node) (bool, error) {
+	endpoints, err := AllEndpoints(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	for _, endpoint := range endpoints {
+		if endpoint.Addr == node.Endpoint.Addr {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(ctx, (10 * time.Second))
+		_, err := client.Status(ctx, endpoint.ClientURL)
+		cancel()
+		if err != nil {
+			continue
+		}
+		return true, nil
+	}
+	return false, nil
 }

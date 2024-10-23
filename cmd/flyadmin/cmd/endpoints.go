@@ -38,7 +38,6 @@ var endpointStatusCmd = &cobra.Command{
 	Short: "Checks the status of the cluster endpoints",
 	Long:  "Checks the status of the cluster endpoints",
 	Run: func(cmd *cobra.Command, args []string) {
-
 		client, err := flyetcd.NewClient([]string{})
 		if err != nil {
 			fmt.Println(err.Error())
@@ -52,16 +51,16 @@ var endpointStatusCmd = &cobra.Command{
 
 		var members []string
 		if useDNS {
-			endpoints, err := flyetcd.AllEndpoints()
+			endpoints, err := flyetcd.AllEndpoints(cmd.Context())
 			if err != nil {
 				fmt.Println(err.Error())
 				return
 			}
 			for _, endpoint := range endpoints {
-				members = append(members, endpoint.ClientUrl)
+				members = append(members, endpoint.ClientURL)
 			}
 		} else {
-			ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
+			ctx, cancel := context.WithTimeout(cmd.Context(), (10 * time.Second))
 			resp, err := client.MemberList(ctx)
 			cancel()
 			if err != nil {

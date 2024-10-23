@@ -2,19 +2,23 @@ package flyetcd
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
 	yaml "gopkg.in/yaml.v3"
 )
 
-const ConfigFilePath = "/data/etcd.yaml"
-const JWTCertPath = "/data"
+const (
+	dataDir        = "/data"
+	ConfigFilePath = "/data/etcd.yaml"
+)
 
 // Example configuration file: https://github.com/etcd-io/etcd/blob/release-3.5/etcd.conf.yml.sample
 type Config struct {
 	Name                     string `yaml:"name"`
 	DataDir                  string `yaml:"data-dir"`
+	DiscoveryDNS             string `yaml:"discovery-srv"`
 	AdvertiseClientUrls      string `yaml:"advertise-client-urls"`
 	ListenClientUrls         string `yaml:"listen-client-urls"`
 	ListenPeerUrls           string `yaml:"listen-peer-urls"`
@@ -35,12 +39,12 @@ type Config struct {
 func NewConfig(endpoint *Endpoint) (*Config, error) {
 	cfg := &Config{
 		Name:                     endpoint.Name,
-		ListenPeerUrls:           endpoint.PeerUrl,
-		AdvertiseClientUrls:      endpoint.ClientUrl,
-		DataDir:                  "/data",
+		ListenPeerUrls:           endpoint.PeerURL,
+		AdvertiseClientUrls:      endpoint.ClientURL,
+		DataDir:                  dataDir,
 		ListenClientUrls:         "http://[::]:2379",
-		InitialAdvertisePeerUrls: endpoint.PeerUrl,
-		InitialCluster:           fmt.Sprintf("%s=%s", endpoint.Name, endpoint.PeerUrl),
+		InitialAdvertisePeerUrls: endpoint.PeerURL,
+		InitialCluster:           fmt.Sprintf("%s=%s", endpoint.Name, endpoint.PeerURL),
 		InitialClusterToken:      getMD5Hash(os.Getenv("FLY_APP_NAME")),
 		InitialClusterState:      "new",
 		AutoCompactionMode:       "periodic",
@@ -60,30 +64,30 @@ func NewConfig(endpoint *Endpoint) (*Config, error) {
 
 func (c *Config) SetAuthToken() error {
 	if !isJWTAuthEnabled() {
+		log.Println("JWT auth is not enabled. Using simple auth.")
 		c.AuthToken = "simple"
 		return nil
 	}
 
-	dir := filepath.Join(JWTCertPath, "certs")
+	dir := filepath.Join(c.DataDir, "certs")
 	if err := os.Mkdir(dir, 0700); err != nil {
 		if !os.IsExist(err) {
-			return err
+			return fmt.Errorf("failed to create jwt cert directory: %w", err)
 		}
 	}
 
 	pubCert := os.Getenv("ETCD_JWT_PUBLIC")
-	pubCertPath := filepath.Join(dir, "jwt_token.pub")
-
 	privCert := os.Getenv("ETCD_JWT_PRIVATE")
-	privCertPath := filepath.Join(dir, "jwt_token")
-
 	signMethod := os.Getenv("ETCD_JWT_SIGN_METHOD")
 
+	pubCertPath := filepath.Join(dir, "jwt_token.pub")
+	privCertPath := filepath.Join(dir, "jwt_token")
+
 	if err := os.WriteFile(privCertPath, []byte(privCert), 0644); err != nil {
-		return err
+		return fmt.Errorf("failed to write private key: %w", err)
 	}
 	if err := os.WriteFile(pubCertPath, []byte(pubCert), 0644); err != nil {
-		return err
+		return fmt.Errorf("failed to write public key: %w", err)
 	}
 
 	c.AuthToken = fmt.Sprintf("jwt,pub-key=%s,priv-key=%s,sign-method=%s",
@@ -95,6 +99,13 @@ func (c *Config) SetAuthToken() error {
 	return nil
 }
 
+func ConfigFilePresent() bool {
+	if _, err := os.Stat(ConfigFilePath); err != nil {
+		return false
+	}
+	return true
+}
+
 func WriteConfig(c *Config) error {
 	data, err := yaml.Marshal(c)
 	if err != nil {
@@ -103,7 +114,7 @@ func WriteConfig(c *Config) error {
 	return os.WriteFile(ConfigFilePath, data, 0700)
 }
 
-func LoadConfig() (*Config, error) {
+func loadConfig() (*Config, error) {
 	var config Config
 	yamlFile, err := os.ReadFile(ConfigFilePath)
 	if err != nil {
@@ -115,13 +126,6 @@ func LoadConfig() (*Config, error) {
 	}
 
 	return &config, nil
-}
-
-func ConfigFilePresent() bool {
-	if _, err := os.Stat(ConfigFilePath); err != nil {
-		return false
-	}
-	return true
 }
 
 func isJWTAuthEnabled() bool {
