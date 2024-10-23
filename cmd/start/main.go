@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"syscall"
 	"time"
@@ -19,7 +20,7 @@ func main() {
 		panicHandler(err)
 	}
 
-	fmt.Println("Waiting for network to come up.")
+	log.Println("Waiting for network to come up.")
 	if err := waitForNetwork(ctx, node); err != nil {
 		panicHandler(err)
 	}
@@ -43,11 +44,12 @@ func main() {
 	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
 
 	if err := svisor.Run(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		panicHandler(err)
 	}
 }
 
+// waitForNetwork waits for the internal network to become accessible.
+// TODO - Consider using
 func waitForNetwork(ctx context.Context, node *flyetcd.Node) error {
 	timeout := time.After(5 * time.Minute)
 	tick := time.Tick(1 * time.Second)

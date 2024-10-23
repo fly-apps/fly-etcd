@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/fly-apps/fly-etcd/internal/flyetcd"
 	"github.com/spf13/cobra"
@@ -42,6 +43,7 @@ var resetForceNewClusterFlagCmd = &cobra.Command{
 		}
 		node.Config.ForceNewCluster = false
 		if err := flyetcd.WriteConfig(node.Config); err != nil {
+			log.Println(err.Error())
 			fmt.Println(err.Error())
 		}
 	},

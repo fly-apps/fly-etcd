@@ -14,7 +14,6 @@ type Node struct {
 }
 
 func NewNode() (*Node, error) {
-	// Build endpoint
 	endpoint, err := currentEndpoint()
 	if err != nil {
 		return nil, err
@@ -22,7 +21,7 @@ func NewNode() (*Node, error) {
 
 	var config *Config
 	if ConfigFilePresent() {
-		config, err = LoadConfig()
+		config, err = loadConfig()
 		if err != nil {
 			return nil, err
 		}
