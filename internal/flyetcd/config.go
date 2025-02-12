@@ -12,16 +12,21 @@ import (
 const (
 	DataDir        = "/data"
 	ConfigFilePath = "/data/etcd.yaml"
+
+	MetricsBaseURL  = "http://[::]:2381"
+	MetricsEndpoint = "http://[::]:2381/metrics"
 )
 
 // Example configuration file: https://github.com/etcd-io/etcd/blob/release-3.5/etcd.conf.yml.sample
 type Config struct {
-	Name                     string `yaml:"name"`
-	DataDir                  string `yaml:"data-dir"`
-	DiscoveryDNS             string `yaml:"discovery-srv"`
-	AdvertiseClientUrls      string `yaml:"advertise-client-urls"`
-	ListenClientUrls         string `yaml:"listen-client-urls"`
-	ListenPeerUrls           string `yaml:"listen-peer-urls"`
+	Name                string `yaml:"name"`
+	DataDir             string `yaml:"data-dir"`
+	DiscoveryDNS        string `yaml:"discovery-srv"`
+	AdvertiseClientUrls string `yaml:"advertise-client-urls"`
+	ListenClientUrls    string `yaml:"listen-client-urls"`
+	ListenPeerUrls      string `yaml:"listen-peer-urls"`
+	ListenMetricsUrls   string `yaml:"listen-metrics-urls"`
+
 	InitialCluster           string `yaml:"initial-cluster"`
 	InitialClusterToken      string `yaml:"initial-cluster-token"`
 	InitialClusterState      string `yaml:"initial-cluster-state"`
@@ -40,11 +45,10 @@ func NewConfig() (*Config, error) {
 	endpoint := NewEndpoint(os.Getenv("FLY_MACHINE_ID"))
 
 	cfg := &Config{
-		Name: endpoint.Name,
-		// Listen on all interfaces (IPv4/IPv6) at the default ports
-		// so etcd doesn’t complain about needing an IP.
-		ListenPeerUrls:   "http://[::]:2380",
-		ListenClientUrls: "http://[::]:2379",
+		Name:              endpoint.Name,
+		ListenPeerUrls:    "http://[::]:2380",
+		ListenClientUrls:  "http://[::]:2379",
+		ListenMetricsUrls: MetricsBaseURL,
 
 		// Advertise the DNS name (or ephemeral IP) so other members can connect to it.
 		InitialAdvertisePeerUrls: endpoint.PeerURL,

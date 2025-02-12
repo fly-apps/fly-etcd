@@ -54,11 +54,30 @@ func main() {
 	svisor.AddProcess("fly-etcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
 	svisor.AddProcess("admin", "/usr/local/bin/start-api")
 
+	if backupsEnabled() {
+		svisor.AddProcess("etcd-backup", "/usr/local/bin/etcd-backup")
+	} else {
+		log.Println("[WARN] Backups are not configured!")
+	}
 	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
 
 	if err := svisor.Run(); err != nil {
 		panicHandler(err)
 	}
+}
+
+func backupsEnabled() bool {
+	// OIDC is enabled
+	if os.Getenv("AWS_REGION") != "" && os.Getenv("AWS_ROLE_ARN") != "" {
+		return true
+	}
+
+	// Static credentials are set
+	if os.Getenv("AWS_ACCESS_KEY_ID") != "" && os.Getenv("AWS_SECRET_ACCESS_KEY") != "" && os.Getenv("AWS_REGION") != "" {
+		return true
+	}
+
+	return false
 }
 
 // waitForNetwork waits for the internal network to become accessible.
