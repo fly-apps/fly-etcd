@@ -28,6 +28,12 @@ func envOrDefault(key, defaultVal string) string {
 	return defaultVal
 }
 
+func closeAndLog(c io.Closer, name string) {
+    if err := c.Close(); err != nil {
+        log.Printf("Error closing %s: %v", name, err)
+    }
+}
+
 func envDurationOrDefault(key string, defaultVal time.Duration) time.Duration {
 	if val, ok := os.LookupEnv(key); ok {
 		if d, err := time.ParseDuration(val); err == nil {
@@ -194,7 +200,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer cli.Close()
+	defer func() {
+		if err := cli.Close(); err != nil {
+			log.Printf("Error closing etcd client: %v", err)
+		}
+	}()
 
 	// Create AWS S3 client and verify credentials
 	var s3Client *s3.Client
@@ -439,7 +449,11 @@ func performBackup(cli *clientv3.Client, s3Client *s3.Client) error {
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			log.Printf("Error removing temporary directory: %v", err)
+		}
+	}()
 
 	backupPath := filepath.Join(tmpDir, fmt.Sprintf("backup-%s.db", time.Now().Format("20060102-150405")))
 
@@ -451,13 +465,14 @@ func performBackup(cli *clientv3.Client, s3Client *s3.Client) error {
 	if err != nil {
 		return fmt.Errorf("failed to create snapshot: %v", err)
 	}
-	defer rc.Close()
+	defer closeAndLog(rc, "snapshot reader")
+
 
 	backupFile, err := os.Create(backupPath)
 	if err != nil {
 		return fmt.Errorf("failed to create backup file: %v", err)
 	}
-	defer backupFile.Close()
+	defer closeAndLog(backupFile, "backup file")
 
 	_, err = io.Copy(backupFile, rc)
 	if err != nil {
@@ -479,7 +494,7 @@ func performBackup(cli *clientv3.Client, s3Client *s3.Client) error {
 	if err != nil {
 		return fmt.Errorf("failed to open backup for upload: %v", err)
 	}
-	defer file.Close()
+	defer closeAndLog(file, "upload file")
 
 	_, err = s3Client.PutObject(context.Background(), &s3.PutObjectInput{
 		Bucket: aws.String(*s3Bucket),
