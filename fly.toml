@@ -3,7 +3,7 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'shaun-etcd-test'
+app = 'steve-etcd-test'
 kill_signal = 'SIGTERM'
 kill_timeout = '30s'
 
@@ -12,7 +12,7 @@ kill_timeout = '30s'
 
 [[mounts]]
   source = 'etcd_data'
-  destination = '/etcd_data'
+  destination = '/data'
 
 [checks]
   [checks.etcd]
@@ -60,3 +60,9 @@ kill_timeout = '30s'
 [[metrics]]
   port = 2379
   path = '/metrics'
+  processes = ['etcd']
+
+[[metrics]]
+  port = 2112
+  path = '/metrics'
+  processes = ['etcd-backups']

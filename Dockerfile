@@ -12,6 +12,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start ./cmd/start
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/start-api ./cmd/api
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/flyadmin ./cmd/flyadmin
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/etcd-backup ./cmd/etcd-backup
 
 RUN curl -L ${DOWNLOAD_URL}/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz -o /tmp/etcd-${ETCD_VERSION}-linux-amd64.tar.gz \
  && tar xzvf /tmp/etcd-${ETCD_VERSION}-linux-amd64.tar.gz -C /usr/local/bin --strip-components=1

@@ -40,7 +40,7 @@ func main() {
 	svisor := supervisor.New("fly-etcd", 5*time.Minute)
 	svisor.AddProcess("fly-etcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
 	svisor.AddProcess("admin", "/usr/local/bin/start-api")
-
+	svisor.AddProcess("etcd-backup", "/usr/local/bin/etcd-backup -check-leader")
 	svisor.StopOnSignal(syscall.SIGINT, syscall.SIGTERM)
 
 	if err := svisor.Run(); err != nil {
