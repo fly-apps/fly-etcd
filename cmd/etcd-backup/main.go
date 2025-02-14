@@ -20,76 +20,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.etcd.io/etcd/client/v3"
 )
-
-func envOrDefault(key, defaultVal string) string {
-	if val, ok := os.LookupEnv(key); ok {
-		return val
-	}
-	return defaultVal
-}
-
-func closeAndLog(c io.Closer, name string) {
-    if err := c.Close(); err != nil {
-        log.Printf("Error closing %s: %v", name, err)
-    }
-}
-
-func envDurationOrDefault(key string, defaultVal time.Duration) time.Duration {
-	if val, ok := os.LookupEnv(key); ok {
-		if d, err := time.ParseDuration(val); err == nil {
-			return d
-		}
-	}
-	return defaultVal
-}
-
-func getDefaultS3Prefix(etcdDNS, etcdEndpoints string) string {
-	// If ETCD_DNS is set, use that without .internal
-	if etcdDNS != "" {
-		if strings.HasSuffix(etcdDNS, ".internal") {
-			return etcdDNS[:len(etcdDNS)-9]
-		}
-		return etcdDNS
-	}
-
-	// If FLY_APP_NAME is set, use that
-	if flyApp, ok := os.LookupEnv("FLY_APP_NAME"); ok {
-		return flyApp
-	}
-
-	// No default
-	return ""
-}
-
-func logClusterStatus(cli *clientv3.Client) error {
-    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-    defer cancel()
-
-    var lastErr error
-    hasEndpoint := false
-
-    for _, ep := range cli.Endpoints() {
-        hasEndpoint = true
-        status, err := cli.Status(ctx, ep)
-        if err != nil {
-            log.Printf("Failed to get status for %s: %v", ep, err)
-            lastErr = err
-            continue
-        }
-        log.Printf("Endpoint %s:", ep)
-        log.Printf("  Member ID: %x", status.Header.MemberId)
-        log.Printf("  Leader ID: %x", status.Leader)
-        log.Printf("  Is Leader: %v", status.Header.MemberId == status.Leader)
-        log.Printf("  Leader: %t", status.Header.MemberId == status.Leader)
-    }
-
-    if !hasEndpoint {
-        return fmt.Errorf("no endpoints available")
-    }
-
-    return lastErr
-}
-
+const MiB = 1024 * 1024
 var (
 	// Command line flags with environment variable fallbacks
 	etcdEndpoints     = flag.String("etcd-endpoints", envOrDefault("ETCD_ENDPOINTS", "localhost:2379"), "Comma-separated list of etcd endpoints")
@@ -156,41 +87,44 @@ func main() {
 	}()
 
 	// Get endpoints
-	var endpoints []string
-	if *etcdDnsName != "" {
-		r := &net.Resolver{
-			PreferGo: true,
-			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-				log.Printf("Attempting DNS connection to [fdaa::3]:53")
-				d := net.Dialer{
-					Timeout: time.Second * 5,
-				}
-				conn, err := d.DialContext(ctx, "udp6", "[fdaa::3]:53")
-				if err != nil {
-					log.Printf("DNS connection error: %v", err)
-					return nil, err
-				}
-				log.Printf("DNS connection successful")
-				return conn, nil
-			},
-		}
-		log.Printf("Looking up %s", *etcdDnsName)
-		ips, err := r.LookupIPAddr(context.Background(), *etcdDnsName)
-		if err != nil {
-			log.Printf("DNS lookup error: %v", err)
-			log.Fatal(err)
-		}
-		for _, ip := range ips {
-			if ip.IP.To4() == nil { // IPv6 only
-				endpoints = append(endpoints, fmt.Sprintf("[%s]:2379", ip.IP.String()))
-			}
-		}
-		if len(endpoints) == 0 {
-			log.Fatal("No IPv6 addresses found for DNS name")
-		}
-	} else {
-		endpoints = []string{*etcdEndpoints}
-	}
+	endpoints := strings.Split(*etcdEndpoints, ",")
+    if *etcdDnsName != "" {
+        // Use the built-in resolver with Fly's DNS server
+        r := &net.Resolver{
+            PreferGo: true,
+            Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+                log.Printf("Attempting DNS connection to [fdaa::3]:53")
+                d := net.Dialer{
+                    Timeout: time.Second * 5,
+                }
+                conn, err := d.DialContext(ctx, "udp6", "[fdaa::3]:53")
+                if err != nil {
+                    log.Printf("DNS connection error: %v", err)
+                    return nil, err
+                }
+                log.Printf("DNS connection successful")
+                return conn, nil
+            },
+        }
+
+        log.Printf("Looking up %s", *etcdDnsName)
+        ips, err := r.LookupIPAddr(context.Background(), *etcdDnsName)
+        if err != nil {
+            log.Printf("DNS lookup error: %v", err)
+            log.Fatal(err)
+        }
+
+        var dnsEndpoints []string
+        for _, ip := range ips {
+            if ip.IP.To4() == nil { // IPv6 only
+                dnsEndpoints = append(dnsEndpoints, fmt.Sprintf("[%s]:2379", ip.IP.String()))
+            }
+        }
+        if len(dnsEndpoints) == 0 {
+            log.Fatal("No IPv6 addresses found for DNS name")
+        }
+        endpoints = dnsEndpoints
+    }
 
 	// Create etcd client
 	cli, err := clientv3.New(clientv3.Config{
@@ -372,30 +306,25 @@ func isLeader(cli *clientv3.Client) (bool, error) {
     foundLocal := false
     log.Printf("Looking for local member. Our possible URLs: %v", localURLs)
     
-    for _, member := range resp.Members {
-        log.Printf("Checking member %x:", member.ID)
-        log.Printf("  Name: %s", member.Name)
-        log.Printf("  Peer URLs: %v", member.PeerURLs)
-        log.Printf("  Client URLs: %v", member.ClientURLs)
-        
-        // Check if any of our local URLs match this member's URLs
-        for _, localURL := range localURLs {
-            for _, clientURL := range member.ClientURLs {
-                if strings.Contains(clientURL, localURL) {
-                    ourMemberId = member.ID
-                    foundLocal = true
-                    log.Printf("  Found match with local URL: %s", localURL)
-                    break
-                }
-            }
-            if foundLocal {
-                break
-            }
-        }
-        if foundLocal {
-            break
-        }
-    }
+    Outer:
+ 		for _, member := range resp.Members {
+			log.Printf("Checking member %x:", member.ID)
+			log.Printf("  Name: %s", member.Name)
+			log.Printf("  Peer URLs: %v", member.PeerURLs)
+			log.Printf("  Client URLs: %v", member.ClientURLs)
+
+			// Check if any of our local URLs match this member's URLs
+			for _, localURL := range localURLs {
+				for _, clientURL := range member.ClientURLs {
+					if strings.Contains(clientURL, localURL) {
+						ourMemberId = member.ID
+						foundLocal = true
+						log.Printf("  Found match with local URL: %s", localURL)
+						break Outer
+					}
+				}
+			}
+		}
 
     if !foundLocal {
         return false, fmt.Errorf("couldn't find local member in member list")
@@ -506,7 +435,76 @@ func performBackup(cli *clientv3.Client, s3Client *s3.Client) error {
 	}
 
 	log.Printf("Successfully created backup: s3://%s/%s (%.2f MB)",
-		*s3Bucket, s3Key, float64(fileInfo.Size())/1024/1024)
+		*s3Bucket, s3Key, float64(fileInfo.Size())/MiB)
 
 	return nil
+}
+
+func envOrDefault(key, defaultVal string) string {
+	if val, ok := os.LookupEnv(key); ok {
+		return val
+	}
+	return defaultVal
+}
+
+func closeAndLog(c io.Closer, name string) {
+    if err := c.Close(); err != nil {
+        log.Printf("Error closing %s: %v", name, err)
+    }
+}
+
+func envDurationOrDefault(key string, defaultVal time.Duration) time.Duration {
+	if val, ok := os.LookupEnv(key); ok {
+		if d, err := time.ParseDuration(val); err == nil {
+			return d
+		}
+	}
+	return defaultVal
+}
+
+func getDefaultS3Prefix(etcdDNS, etcdEndpoints string) string {
+	// If ETCD_DNS is set, use that without .internal
+	if etcdDNS != "" {
+		if strings.HasSuffix(etcdDNS, ".internal") {
+			return etcdDNS[:len(etcdDNS)-9]
+		}
+		return etcdDNS
+	}
+
+	// If FLY_APP_NAME is set, use that
+	if flyApp, ok := os.LookupEnv("FLY_APP_NAME"); ok {
+		return flyApp
+	}
+
+	// No default
+	return ""
+}
+
+func logClusterStatus(cli *clientv3.Client) error {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    var lastErr error
+    hasEndpoint := false
+
+    for _, ep := range cli.Endpoints() {
+        hasEndpoint = true
+        status, err := cli.Status(ctx, ep)
+        if err != nil {
+            log.Printf("Failed to get status for %s: %v", ep, err)
+            lastErr = err
+            continue
+        }
+        log.Printf("Endpoint %s:", ep)
+        log.Printf("  Member ID: %x", status.Header.MemberId)
+        log.Printf("  Leader ID: %x", status.Leader)
+        log.Printf("  Is Leader: %v", status.Header.MemberId == status.Leader)
+        log.Printf("  Leader: %t", status.Header.MemberId == status.Leader)
+    }
+
+    if !hasEndpoint {
+        return fmt.Errorf("no endpoints available")
+    }
+
+    return lastErr
 }
