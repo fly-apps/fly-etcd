@@ -44,3 +44,25 @@ fly scale count 3
 
 
 ## Recovering from Quorum loss
+
+
+## Backups and Restoring from backups
+
+If the following environment variables are set, a backup will be performed and uploaded to S3 on a schedule:
+
+```
+AWS_REGION
+AWS_SECRET_ACCESS_KEY
+AWS_ACCESS_KEY_ID
+BACKUP_INTERVAL (default: "1h")
+S3_BUCKET=fly-etcd-backups
+```
+
+A backup can be restored using the following process:
+
+Scale down the app to a single node
+On the remaining node, run `etcd-restore`. You can list available versions with `etcd-restore -list` and restore a specific version with `etcd-restore -version=<version>`.
+`fly app restart`
+Check the logs to make sure it's started and healthy.
+Scale back up again one node at a time.
+** You may have to delete the old volumes from the previous machines as they contain member config. Either that or delete the contents of `/data` before scaling down. **
