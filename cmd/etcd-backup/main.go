@@ -170,11 +170,12 @@ func main() {
 			}
 
 			isLeader, err := isLeader(cli)
-			if err != nil {
+			switch {
+			case err != nil:
 				log.Printf("Failed to check leader status: %v", err)
-			} else if !isLeader {
+			case !isLeader:
 				log.Printf("Not the leader, skipping immediate backup")
-			} else {
+			default:
 				if err := performBackup(cli, s3Client); err != nil {
 					log.Printf("Initial backup failed: %v", err)
 					backupSuccess.Set(0)
@@ -204,6 +205,11 @@ func main() {
 
 	// Run backup loop
 	for {
+		// Calculate next run time
+		nextRun = calculateNextRun(*backupInterval, *scheduleOffset)
+		log.Printf("Next scheduled backup: %s", nextRun)
+		time.Sleep(time.Until(nextRun))
+
 		if *checkLeader {
 			if err := logClusterStatus(cli); err != nil {
 				log.Printf("Failed to log cluster status: %v", err)
@@ -212,18 +218,12 @@ func main() {
 			isLeader, err := isLeader(cli)
 			if err != nil {
 				log.Printf("Failed to check leader status: %v", err)
-				// Calculate next run time and continue
-				nextRun = calculateNextRun(*backupInterval, *scheduleOffset)
-				log.Printf("Next scheduled backup check: %s", nextRun)
-				time.Sleep(time.Until(nextRun))
+				continue
 			}
 			
 			if !isLeader {
 				log.Printf("Not the leader, skipping backup")
-				// Calculate next run time and continue
-				nextRun = calculateNextRun(*backupInterval, *scheduleOffset)
-				log.Printf("Next scheduled backup check: %s", nextRun)
-				time.Sleep(time.Until(nextRun))
+				continue
 			}
 			
 			log.Printf("We are the leader, proceeding with backup")
@@ -237,11 +237,6 @@ func main() {
 		}
 
 		lastBackupTimestamp.Set(float64(time.Now().Unix()))
-
-		// Calculate next run time
-		nextRun = calculateNextRun(*backupInterval, *scheduleOffset)
-		log.Printf("Next scheduled backup: %s", nextRun)
-		time.Sleep(time.Until(nextRun))
 	}
 }
 
@@ -277,7 +272,7 @@ func getLocalMemberURLs() ([]string, error) {
             if ip.To4() != nil {
                 urls = append(urls, ip.String()+":2379")
             } else {
-                urls = append(urls, "["+ip.String()+"]:2379")
+                urls = append(urls, "[%s]:2379",ip.String())
             }
         }
     }
