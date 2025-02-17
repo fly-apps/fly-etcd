@@ -93,7 +93,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			log.Printf("Error removing temporary directory: %v", err)
+		}
+	}()
 
 	// If no specific version requested, get the latest
 	if *version == "" {
@@ -141,6 +146,12 @@ func main() {
     log.Printf("   --initial-cluster-state=new")
     log.Printf("   --initial-cluster=%s", initialCluster)
     log.Printf("2. Then start other nodes with the same --initial-cluster value")
+}
+
+func closeAndLog(c io.Closer, name string) {
+    if err := c.Close(); err != nil {
+        log.Printf("Error closing %s: %v", name, err)
+    }
 }
 
 func getMD5Hash(str string) string {
@@ -371,7 +382,7 @@ func downloadSnapshot(s3Client *s3.Client, tmpDir string, versionId string) erro
 	if err != nil {
 		return fmt.Errorf("failed to create snapshot file: %v", err)
 	}
-	defer file.Close()
+	defer closeAndLog(file, "download snapshot")
 
 	s3Key := filepath.Join(*s3Prefix, "etcd-backup.db")
 	input := &s3.GetObjectInput{
@@ -386,7 +397,7 @@ func downloadSnapshot(s3Client *s3.Client, tmpDir string, versionId string) erro
 	if err != nil {
 		return fmt.Errorf("failed to download from S3: %v", err)
 	}
-	defer result.Body.Close()
+	defer closeAndLog(result.Body, "download from s3")
 
 	if _, err := io.Copy(file, result.Body); err != nil {
 		return fmt.Errorf("failed to write snapshot: %v", err)
