@@ -17,7 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/expfmt"
 	"go.etcd.io/etcd/client/v3"
 )
 const MiB = 1024 * 1024
@@ -32,6 +32,7 @@ var (
 	s3Bucket          = flag.String("s3-bucket", envOrDefault("S3_BUCKET", ""), "S3 bucket name")
 	s3Prefix          = flag.String("s3-prefix", envOrDefault("S3_PREFIX", ""), "S3 key prefix")
 	metricsAddr       = flag.String("metrics-addr", envOrDefault("METRICS_ADDR", ":2112"), "The address to listen on for Prometheus metrics requests")
+	etcdMetricsURL 	  = flag.String("etcd-metrics-url", envOrDefault("ETCD_METRICS_URL", "http://localhost:2379/metrics"), "URL of etcd metrics endpoint")
 )
 
 var (
@@ -56,6 +57,11 @@ var (
 		Name: "etcd_backup_last_timestamp_seconds",
 		Help: "Timestamp of the last backup attempt",
 	})
+
+	scrapeErrors = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "etcd_metrics_scrape_errors_total",
+		Help: "Number of errors encountered when scraping etcd metrics",
+	})	
 )
 
 func init() {
@@ -63,6 +69,7 @@ func init() {
 	prometheus.MustRegister(backupSize)
 	prometheus.MustRegister(backupSuccess)
 	prometheus.MustRegister(lastBackupTimestamp)
+	prometheus.MustRegister(scrapeErrors)
 }
 
 func main() {
@@ -82,7 +89,8 @@ func main() {
 
 	// Start metrics server
 	go func() {
-		http.Handle("/metrics", promhttp.Handler())
+		log.Printf("Starting metrics server on %s, proxying etcd metrics from %s", *metricsAddr, *etcdMetricsURL)
+		http.Handle("/metrics", createMetricsHandler(*etcdMetricsURL))
 		log.Fatal(http.ListenAndServe(*metricsAddr, nil))
 	}()
 
@@ -196,18 +204,13 @@ func main() {
 		
 	}
 
-	// Calculate initial next run time
-	nextRun := calculateNextRun(*backupInterval, *scheduleOffset)
-	log.Printf("Next scheduled backup: %s", nextRun)
-
-	// Wait for next run time
-	time.Sleep(time.Until(nextRun))
-
 	// Run backup loop
 	for {
-		// Calculate next run time
-		nextRun = calculateNextRun(*backupInterval, *scheduleOffset)
+		// Calculate initial next run time
+		nextRun := calculateNextRun(*backupInterval, *scheduleOffset)
 		log.Printf("Next scheduled backup: %s", nextRun)
+
+		// Wait for next run time
 		time.Sleep(time.Until(nextRun))
 
 		if *checkLeader {
@@ -272,7 +275,7 @@ func getLocalMemberURLs() ([]string, error) {
             if ip.To4() != nil {
                 urls = append(urls, ip.String()+":2379")
             } else {
-                urls = append(urls, "[%s]:2379",ip.String())
+                urls = append(urls, fmt.Sprintf("[%s]:2379",ip.String()))
             }
         }
     }
@@ -502,4 +505,54 @@ func logClusterStatus(cli *clientv3.Client) error {
     }
 
     return lastErr
+}
+
+func createMetricsHandler(etcdMetricsURL string) http.Handler {
+
+	// Create gatherers slice with the default registry first
+    gatherers := prometheus.Gatherers{
+        prometheus.DefaultGatherer,
+    }
+
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // Set common headers
+        w.Header().Set("Content-Type", string(expfmt.FmtText))
+
+        // First gather and write our local metrics
+        mfs, err := gatherers.Gather()
+        if err != nil {
+            http.Error(w, "Error gathering metrics: "+err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        encoder := expfmt.NewEncoder(w, expfmt.FmtText)
+        for _, mf := range mfs {
+            if err := encoder.Encode(mf); err != nil {
+                log.Printf("Error writing metrics: %v", err)
+                http.Error(w, "Error writing metrics: "+err.Error(), http.StatusInternalServerError)
+                return
+            }
+        }
+
+        // Add a newline separator
+        w.Write([]byte("\n"))
+
+        // Then fetch and write etcd metrics
+        client := http.Client{
+            Timeout: 5 * time.Second,
+        }
+        resp, err := client.Get(etcdMetricsURL)
+        if err != nil {
+            log.Printf("Error scraping etcd metrics: %v", err)
+            scrapeErrors.Inc()
+            return
+        }
+        defer resp.Body.Close()
+
+        _, err = io.Copy(w, resp.Body)
+        if err != nil {
+            log.Printf("Error writing etcd metrics: %v", err)
+            scrapeErrors.Inc()
+        }
+    })
 }

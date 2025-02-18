@@ -58,11 +58,5 @@ kill_timeout = '30s'
     timeout = '2s'
 
 [[metrics]]
-  port = 2379
-  path = '/metrics'
-  processes = ['etcd']
-
-[[metrics]]
   port = 2112
   path = '/metrics'
-  processes = ['etcd-backups']
