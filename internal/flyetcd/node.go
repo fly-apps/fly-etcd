@@ -3,31 +3,31 @@ package flyetcd
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 )
 
 type Node struct {
-	AppName  string
-	Endpoint *Endpoint
-	Config   *Config
+	AppName   string
+	MachineID string
+	Endpoint  *Endpoint
+	Config    *Config
 }
 
 func NewNode() (*Node, error) {
-	endpoint, err := currentEndpoint()
-	if err != nil {
-		return nil, err
-	}
-
 	var config *Config
+	var err error
+
+	endpoint := currentEndpoint()
+
 	if ConfigFilePresent() {
+		// TODO - We should probably consider rebuilding the config.
 		config, err = loadConfig()
 		if err != nil {
 			return nil, err
 		}
-
 	} else {
-		// Generate new conifg
 		config, err = NewConfig(endpoint)
 		if err != nil {
 			return nil, err
@@ -35,27 +35,26 @@ func NewNode() (*Node, error) {
 	}
 
 	node := &Node{
-		AppName:  envOrDefault("FLY_APP_NAME", "local"),
-		Endpoint: endpoint,
-		Config:   config,
+		AppName:   os.Getenv("FLY_APP_NAME"),
+		MachineID: os.Getenv("FLY_MACHINE_ID"),
+		Endpoint:  endpoint,
+		Config:    config,
 	}
 
 	return node, nil
 }
 
 func (n *Node) Bootstrap(ctx context.Context) error {
-	// Initialize client using the default uri.
 	client, err := NewClient([]string{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize etcd client: %w", err)
 	}
 
-	// TODO - Known race condition here. Need to come up with a better process
-	// for identifying whether a cluster is active or not.
-	// Check to see if the cluster has been initialized.
+	// TODO - Known race condition here. Consider using a discovery cluster or multi-tenant consul to
+	// flag that the cluster has been initialized.
 	clusterReady, err := clusterInitialized(ctx, client, n)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to verify cluster state: %w", err)
 	}
 
 	// If the cluster is ready, add the node to the cluster.
@@ -86,9 +85,8 @@ func (n *Node) Bootstrap(ctx context.Context) error {
 	return WriteConfig(n.Config)
 }
 
-// clusterInitialized will check-in with the the other nodes in the network
-// to see if any of them respond to status. The Status function
-// will return a result regardless of whether the cluster meets quorum or not.
+// clusterInitialized will check-in with the the other nodes within the network
+// to see if any of them respond to status.
 func clusterInitialized(ctx context.Context, client *Client, node *Node) (bool, error) {
 	endpoints, err := AllEndpoints(ctx)
 	if err != nil {
@@ -99,10 +97,9 @@ func clusterInitialized(ctx context.Context, client *Client, node *Node) (bool, 
 		if endpoint.Addr == node.Endpoint.Addr {
 			continue
 		}
-		ctx, cancel := context.WithTimeout(ctx, (10 * time.Second))
-		_, err := client.Status(ctx, endpoint.ClientURL)
-		cancel()
-		if err != nil {
+		reqCtx, cancel := context.WithTimeout(ctx, (10 * time.Second))
+		defer cancel()
+		if _, err := client.Status(reqCtx, endpoint.ClientURL); err != nil {
 			continue
 		}
 		return true, nil
