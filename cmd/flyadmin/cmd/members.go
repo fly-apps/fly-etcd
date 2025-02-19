@@ -42,7 +42,7 @@ var memberRemoveCmd = &cobra.Command{
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
+		ctx, cancel := context.WithTimeout(cmd.Context(), (10 * time.Second))
 		resp, err := client.MemberRemove(ctx, i64)
 		cancel()
 		if err != nil {
@@ -63,7 +63,7 @@ var membersListCmd = &cobra.Command{
 			fmt.Println(err.Error())
 			return
 		}
-		ctx, cancel := context.WithTimeout(context.TODO(), (10 * time.Second))
+		ctx, cancel := context.WithTimeout(cmd.Context(), (10 * time.Second))
 		resp, err := client.MemberList(ctx)
 		cancel()
 		if err != nil {

@@ -36,7 +36,9 @@ type Config struct {
 	SnapshotCount int `yaml:"snapshot-count"`
 }
 
-func NewConfig(endpoint *Endpoint) (*Config, error) {
+func NewConfig() (*Config, error) {
+	endpoint := NewEndpoint(os.Getenv("FLY_MACHINE_ID"))
+
 	cfg := &Config{
 		Name: endpoint.Name,
 		// Listen on all interfaces (IPv4/IPv6) at the default ports

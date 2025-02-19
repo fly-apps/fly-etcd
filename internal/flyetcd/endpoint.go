@@ -15,9 +15,19 @@ type Endpoint struct {
 	PeerURL   string
 }
 
-func NewEndpoint(addr string) *Endpoint {
+// NewEndpoint returns a new Endpoint for a given machine ID.
+func NewEndpoint(machineID string) *Endpoint {
+	// If no machineID is specified, default to self.
+	if machineID == "" {
+		machineID = os.Getenv("FLY_MACHINE_ID")
+	}
+
+	addr := fmt.Sprintf("%s.vm.%s.internal",
+		machineID,
+		os.Getenv("FLY_APP_NAME"))
+
 	return &Endpoint{
-		Name:      os.Getenv("FLY_MACHINE_ID"),
+		Name:      machineID,
 		Addr:      addr,
 		ClientURL: fmt.Sprintf("http://%s:2379", addr),
 		PeerURL:   fmt.Sprintf("http://%s:2380", addr),
@@ -33,19 +43,19 @@ func AllEndpoints(ctx context.Context) ([]*Endpoint, error) {
 	var endpoints []*Endpoint
 	for _, m := range machines {
 
-		endpoints = append(endpoints, endpointFromMachine(m))
+		endpoints = append(endpoints, NewEndpoint(m.ID))
 	}
 	return endpoints, nil
 }
 
-func currentEndpoint() *Endpoint {
-	endpoint := fmt.Sprintf("%s.vm.%s.internal",
-		os.Getenv(("FLY_MACHINE_ID")),
-		os.Getenv("FLY_APP_NAME"))
-
-	return NewEndpoint(endpoint)
-}
-
-func endpointFromMachine(machine privnet.Machine) *Endpoint {
-	return NewEndpoint(fmt.Sprintf("%s.vm.%s.internal", machine.ID, os.Getenv("FLY_APP_NAME")))
+func AllPeerURLs(ctx context.Context) ([]string, error) {
+	endpoints, err := AllEndpoints(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var urls []string
+	for _, e := range endpoints {
+		urls = append(urls, e.PeerURL)
+	}
+	return urls, nil
 }
