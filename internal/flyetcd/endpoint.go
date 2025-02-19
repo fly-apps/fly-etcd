@@ -17,6 +17,11 @@ type Endpoint struct {
 
 // NewEndpoint returns a new Endpoint for a given machine ID.
 func NewEndpoint(machineID string) *Endpoint {
+	// If no machineID is specified, default to self.
+	if machineID == "" {
+		machineID = os.Getenv("FLY_MACHINE_ID")
+	}
+
 	addr := fmt.Sprintf("%s.vm.%s.internal",
 		machineID,
 		os.Getenv("FLY_APP_NAME"))
