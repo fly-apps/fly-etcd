@@ -48,26 +48,29 @@ func NewClient(endpoints []string) (*Client, error) {
 	return &Client{c}, nil
 }
 
-func (c *Client) MemberID(ctx context.Context, name string) (uint64, error) {
+// MemberID returns the ID of the member with the given machineID.
+func (c *Client) MemberID(ctx context.Context, machineID string) (uint64, error) {
 	resp, err := c.MemberList(ctx)
 	if err != nil {
 		return 0, err
 	}
 	for _, member := range resp.Members {
-		if member.Name == name {
+		if member.Name == machineID {
 			return member.ID, nil
 		}
 	}
-	return 0, &MemberNotFoundError{Err: fmt.Errorf("no member found with matching name %q", name)}
+	return 0, &MemberNotFoundError{Err: fmt.Errorf("no member found with matching machine id: %q", machineID)}
 }
 
-func (c *Client) IsLeader(ctx context.Context, node *Node) (bool, error) {
-	resp, err := c.Client.Status(ctx, node.Config.InitialAdvertisePeerUrls)
+// IsLeader returns true if the member associated with the specified machineID is the leader.
+func (c *Client) IsLeader(ctx context.Context, machineID string) (bool, error) {
+	endpoint := NewEndpoint(machineID)
+	resp, err := c.Client.Status(ctx, endpoint.PeerURL)
 	if err != nil {
 		return false, err
 	}
 
-	id, err := c.MemberID(ctx, node.Config.Name)
+	id, err := c.MemberID(ctx, endpoint.Name)
 	if err != nil {
 		return false, err
 	}

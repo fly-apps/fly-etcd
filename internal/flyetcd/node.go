@@ -16,32 +16,37 @@ type Node struct {
 }
 
 func NewNode() (*Node, error) {
-	var config *Config
-	var err error
-
-	endpoint := currentEndpoint()
-
-	if ConfigFilePresent() {
-		// TODO - We should probably consider rebuilding the config.
-		config, err = loadConfig()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		config, err = NewConfig(endpoint)
-		if err != nil {
-			return nil, err
-		}
+	config, err := resolveConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize node: %w", err)
 	}
 
 	node := &Node{
 		AppName:   os.Getenv("FLY_APP_NAME"),
 		MachineID: os.Getenv("FLY_MACHINE_ID"),
-		Endpoint:  endpoint,
+		Endpoint:  NewEndpoint(os.Getenv("FLY_MACHINE_ID")),
 		Config:    config,
 	}
 
 	return node, nil
+}
+
+func resolveConfig() (*Config, error) {
+
+	switch ConfigFilePresent() {
+	case true:
+		cfg, err := loadConfig()
+		if err != nil {
+			return nil, fmt.Errorf("failed to load config: %w", err)
+		}
+		return cfg, nil
+	default:
+		cfg, err := NewConfig()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new config: %w", err)
+		}
+		return cfg, nil
+	}
 }
 
 func (n *Node) Bootstrap(ctx context.Context) error {
