@@ -47,3 +47,15 @@ func AllEndpoints(ctx context.Context) ([]*Endpoint, error) {
 	}
 	return endpoints, nil
 }
+
+func AllPeerURLs(ctx context.Context) ([]string, error) {
+	endpoints, err := AllEndpoints(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var urls []string
+	for _, e := range endpoints {
+		urls = append(urls, e.PeerURL)
+	}
+	return urls, nil
+}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	client "go.etcd.io/etcd/client/v3"
 )
 
@@ -62,10 +63,30 @@ func (c *Client) MemberID(ctx context.Context, machineID string) (uint64, error)
 	return 0, &MemberNotFoundError{Err: fmt.Errorf("no member found with matching machine id: %q", machineID)}
 }
 
+func (c *Client) LeaderMember(ctx context.Context) (*etcdserverpb.Member, error) {
+	members, err := c.MemberList(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, member := range members.Members {
+		isLeader, err := c.IsLeader(ctx, member.Name)
+		if err != nil {
+			continue
+		}
+
+		if isLeader {
+			return member, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no leader found")
+}
+
 // IsLeader returns true if the member associated with the specified machineID is the leader.
 func (c *Client) IsLeader(ctx context.Context, machineID string) (bool, error) {
 	endpoint := NewEndpoint(machineID)
-	resp, err := c.Client.Status(ctx, endpoint.PeerURL)
+	resp, err := c.Client.Status(ctx, endpoint.ClientURL)
 	if err != nil {
 		return false, err
 	}
@@ -75,9 +96,5 @@ func (c *Client) IsLeader(ctx context.Context, machineID string) (bool, error) {
 		return false, err
 	}
 
-	if resp.Leader == id {
-		return true, nil
-	}
-
-	return false, nil
+	return resp.Leader == id, nil
 }
