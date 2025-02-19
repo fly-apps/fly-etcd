@@ -17,12 +17,12 @@ func (e *MemberNotFoundError) Error() string {
 	return fmt.Sprintf("%v", e.Err)
 }
 
+// Client is a wrapper around the etcd client.
 type Client struct {
 	*client.Client
 }
 
 func NewClient(endpoints []string) (*Client, error) {
-
 	// If no endpoints are specified use our internal uri.
 	if len(endpoints) == 0 {
 		endpoints = []string{fmt.Sprintf("http://%s.internal:2379", os.Getenv("FLY_APP_NAME"))}
@@ -48,7 +48,7 @@ func NewClient(endpoints []string) (*Client, error) {
 	return &Client{c}, nil
 }
 
-func (c *Client) MemberId(ctx context.Context, name string) (uint64, error) {
+func (c *Client) MemberID(ctx context.Context, name string) (uint64, error) {
 	resp, err := c.MemberList(ctx)
 	if err != nil {
 		return 0, err
@@ -67,7 +67,7 @@ func (c *Client) IsLeader(ctx context.Context, node *Node) (bool, error) {
 		return false, err
 	}
 
-	id, err := c.MemberId(ctx, node.Config.Name)
+	id, err := c.MemberID(ctx, node.Config.Name)
 	if err != nil {
 		return false, err
 	}
@@ -78,24 +78,3 @@ func (c *Client) IsLeader(ctx context.Context, node *Node) (bool, error) {
 
 	return false, nil
 }
-
-// func (c *EtcdClient) InitializeAuth(ctx context.Context) error {
-// 	if err := c.CreateUser(ctx, "root", envOrDefault("ETCD_PASSWORD", "password")); err != nil {
-// 		switch err {
-// 		case rpctypes.ErrUserAlreadyExist:
-// 		case rpctypes.ErrUserEmpty: // Auth has already been enabled.
-// 			return nil
-// 		default:
-// 			return err
-// 		}
-// 	}
-
-// 	if err := c.GrantRoleToUser(ctx, "root", "root"); err != nil {
-// 		return err
-// 	}
-
-// 	if err := c.EnableAuthentication(ctx); err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }

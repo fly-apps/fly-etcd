@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"sync"
@@ -54,10 +55,19 @@ func (m *multiOutput) PipeOutput(proc *process) {
 	pipe := m.openPipe(proc)
 
 	go func(proc *process, pipe *ptyPipe) {
-		scanner := bufio.NewScanner(pipe.pty)
-
-		for scanner.Scan() {
-			m.WriteLine(proc, scanner.Bytes())
+		reader := bufio.NewReader(pipe.pty)
+		for {
+			line, err := reader.ReadBytes('\n')
+			// Only write non-empty lines.
+			if len(line) > 0 {
+				m.WriteLine(proc, line)
+			}
+			if err != nil {
+				if err != io.EOF {
+					log.Printf("reader error: %v", err)
+				}
+				break
+			}
 		}
 	}(proc, pipe)
 }
@@ -83,6 +93,8 @@ func (m *multiOutput) WriteLine(proc *process, p []byte) {
 
 	buf.WriteString("\033[0m | ")
 
+	// remove trailing newline if present.
+	p = bytes.TrimSuffix(p, []byte("\n"))
 	buf.Write(p)
 	buf.WriteByte('\n')
 

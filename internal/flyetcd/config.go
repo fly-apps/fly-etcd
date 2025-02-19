@@ -38,21 +38,28 @@ type Config struct {
 
 func NewConfig(endpoint *Endpoint) (*Config, error) {
 	cfg := &Config{
-		Name:                     endpoint.Name,
-		ListenPeerUrls:           endpoint.PeerURL,
-		AdvertiseClientUrls:      endpoint.ClientURL,
-		DataDir:                  dataDir,
-		ListenClientUrls:         "http://[::]:2379",
+		Name: endpoint.Name,
+		// Listen on all interfaces (IPv4/IPv6) at the default ports
+		// so etcd doesn’t complain about needing an IP.
+		ListenPeerUrls:   "http://[::]:2380",
+		ListenClientUrls: "http://[::]:2379",
+
+		// Advertise the DNS name (or ephemeral IP) so other members can connect to it.
 		InitialAdvertisePeerUrls: endpoint.PeerURL,
-		InitialCluster:           fmt.Sprintf("%s=%s", endpoint.Name, endpoint.PeerURL),
-		InitialClusterToken:      getMD5Hash(os.Getenv("FLY_APP_NAME")),
-		InitialClusterState:      "new",
-		AutoCompactionMode:       "periodic",
-		AutoCompactionRetention:  "1",
-		AuthToken:                "",
-		MaxSnapshots:             10,
-		MaxWals:                  10,
-		SnapshotCount:            10000, // Default
+		AdvertiseClientUrls:      endpoint.ClientURL,
+
+		// Etcd data directory
+		DataDir: dataDir,
+
+		InitialCluster:          fmt.Sprintf("%s=%s", endpoint.Name, endpoint.PeerURL),
+		InitialClusterToken:     getMD5Hash(os.Getenv("FLY_APP_NAME")),
+		InitialClusterState:     "new",
+		AutoCompactionMode:      "periodic",
+		AutoCompactionRetention: "1",
+		AuthToken:               "",
+		MaxSnapshots:            10,
+		MaxWals:                 10,
+		SnapshotCount:           10000, // Default
 	}
 
 	if err := cfg.SetAuthToken(); err != nil {
@@ -60,6 +67,21 @@ func NewConfig(endpoint *Endpoint) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func ConfigFilePresent() bool {
+	if _, err := os.Stat(ConfigFilePath); err != nil {
+		return false
+	}
+	return true
+}
+
+func WriteConfig(c *Config) error {
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(ConfigFilePath, data, 0700)
 }
 
 func (c *Config) SetAuthToken() error {
@@ -97,21 +119,6 @@ func (c *Config) SetAuthToken() error {
 	)
 
 	return nil
-}
-
-func ConfigFilePresent() bool {
-	if _, err := os.Stat(ConfigFilePath); err != nil {
-		return false
-	}
-	return true
-}
-
-func WriteConfig(c *Config) error {
-	data, err := yaml.Marshal(c)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(ConfigFilePath, data, 0700)
 }
 
 func loadConfig() (*Config, error) {

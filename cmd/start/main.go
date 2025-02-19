@@ -15,6 +15,14 @@ import (
 func main() {
 	ctx := context.Background()
 
+	if os.Getenv("FLY_APP_NAME") == "" {
+		panicHandler(fmt.Errorf("FLY_APP_NAME is not set"))
+	}
+
+	if os.Getenv("FLY_MACHINE_ID") == "" {
+		panicHandler(fmt.Errorf("FLY_MACHINE_ID is not set"))
+	}
+
 	node, err := flyetcd.NewNode()
 	if err != nil {
 		panicHandler(err)
@@ -49,7 +57,6 @@ func main() {
 }
 
 // waitForNetwork waits for the internal network to become accessible.
-// TODO - Consider using
 func waitForNetwork(ctx context.Context, node *flyetcd.Node) error {
 	timeout := time.After(5 * time.Minute)
 	tick := time.Tick(1 * time.Second)

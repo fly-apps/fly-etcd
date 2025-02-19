@@ -17,29 +17,35 @@ type Endpoint struct {
 
 func NewEndpoint(addr string) *Endpoint {
 	return &Endpoint{
-		Name:      getMD5Hash(addr),
+		Name:      os.Getenv("FLY_MACHINE_ID"),
 		Addr:      addr,
-		ClientURL: fmt.Sprintf("http://[%s]:2379", addr),
-		PeerURL:   fmt.Sprintf("http://[%s]:2380", addr),
+		ClientURL: fmt.Sprintf("http://%s:2379", addr),
+		PeerURL:   fmt.Sprintf("http://%s:2380", addr),
 	}
 }
 
-func currentEndpoint() (*Endpoint, error) {
-	privateIP, err := privnet.PrivateIPv6()
-	if err != nil {
-		return nil, err
-	}
-	return NewEndpoint(privateIP.String()), nil
-}
-
+// AllEndpoints uses DNS to return all Machines associated with the app.
 func AllEndpoints(ctx context.Context) ([]*Endpoint, error) {
-	addrs, err := privnet.AllPeers(ctx, os.Getenv("FLY_APP_NAME"))
+	machines, err := privnet.AllMachines(ctx, os.Getenv("FLY_APP_NAME"))
 	if err != nil {
 		return nil, err
 	}
 	var endpoints []*Endpoint
-	for _, addr := range addrs {
-		endpoints = append(endpoints, NewEndpoint(addr.String()))
+	for _, m := range machines {
+
+		endpoints = append(endpoints, endpointFromMachine(m))
 	}
 	return endpoints, nil
+}
+
+func currentEndpoint() *Endpoint {
+	endpoint := fmt.Sprintf("%s.vm.%s.internal",
+		os.Getenv(("FLY_MACHINE_ID")),
+		os.Getenv("FLY_APP_NAME"))
+
+	return NewEndpoint(endpoint)
+}
+
+func endpointFromMachine(machine privnet.Machine) *Endpoint {
+	return NewEndpoint(fmt.Sprintf("%s.vm.%s.internal", machine.ID, os.Getenv("FLY_APP_NAME")))
 }
