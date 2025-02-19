@@ -31,24 +31,6 @@ func NewNode() (*Node, error) {
 	return node, nil
 }
 
-func resolveConfig() (*Config, error) {
-
-	switch ConfigFilePresent() {
-	case true:
-		cfg, err := loadConfig()
-		if err != nil {
-			return nil, fmt.Errorf("failed to load config: %w", err)
-		}
-		return cfg, nil
-	default:
-		cfg, err := NewConfig()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create new config: %w", err)
-		}
-		return cfg, nil
-	}
-}
-
 func (n *Node) Bootstrap(ctx context.Context) error {
 	client, err := NewClient([]string{})
 	if err != nil {
@@ -88,6 +70,23 @@ func (n *Node) Bootstrap(ctx context.Context) error {
 	}
 
 	return WriteConfig(n.Config)
+}
+
+func resolveConfig() (*Config, error) {
+	switch ConfigFilePresent() {
+	case true:
+		cfg, err := loadConfig()
+		if err != nil {
+			return nil, fmt.Errorf("failed to load config: %w", err)
+		}
+		return cfg, nil
+	default:
+		cfg, err := NewConfig()
+		if err != nil {
+			return nil, fmt.Errorf("failed to create new config: %w", err)
+		}
+		return cfg, nil
+	}
 }
 
 // clusterInitialized will check-in with the the other nodes within the network
