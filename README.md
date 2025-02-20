@@ -4,13 +4,14 @@ Etcd deployment built to run on Fly.
 
 ## Preparing your app
 
-**Initialize a new Fly App**
+### Initialize a new Fly App
 
-_Note: Client requests should be directed to port 2379._ 
-
+_Note: Before running the command below, ensure the mount destination within the `fly.toml` is set to the `/data` directory.  If this is NOT set correctly the deploy will fail._
 ```
 fly launch
 ```
+
+
 
 ## Horizontal scaling
 
