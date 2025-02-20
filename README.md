@@ -17,7 +17,7 @@ fly launch
 *Note: While you can *technically* scale your Etcd app up multiple members at a time, it's recommended that you scale in increments of one until you've reached your target cluster size.*
 
 ### Adding members
-When scaling, make sure you monitor your logs for errors and ensure your cluster is healthy before performing any subsequent scaling operations.  Newly added members are considered for quorum even if the member is not reachable from other existing members.
+When scaling, make sure you monitor your logs for errors and ensure your cluster is healthy before performing any subsequent scaling operations.
 
 ```
 fly machines clone <machine-id>
