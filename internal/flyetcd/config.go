@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	dataDir        = "/data"
+	DataDir        = "/data"
 	ConfigFilePath = "/data/etcd.yaml"
 )
 
@@ -51,7 +51,7 @@ func NewConfig() (*Config, error) {
 		AdvertiseClientUrls:      endpoint.ClientURL,
 
 		// Etcd data directory
-		DataDir: dataDir,
+		DataDir: DataDir,
 
 		InitialCluster:          fmt.Sprintf("%s=%s", endpoint.Name, endpoint.PeerURL),
 		InitialClusterToken:     getMD5Hash(os.Getenv("FLY_APP_NAME")),
