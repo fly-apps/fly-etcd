@@ -28,6 +28,11 @@ func main() {
 		panicHandler(err)
 	}
 
+	// Ensure the volume is mounted at the correct path.
+	if _, err := os.Stat(flyetcd.DataDir); err != nil {
+		panicHandler(fmt.Errorf("volume must be mounted at /data: %w", err))
+	}
+
 	log.Println("Waiting for network to come up.")
 	if err := waitForNetwork(ctx, node); err != nil {
 		panicHandler(err)

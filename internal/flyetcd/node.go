@@ -79,6 +79,10 @@ func resolveConfig() (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to load config: %w", err)
 		}
+		// This is a workaround for existing clusters that may have the wrong
+		// data dir set.
+		cfg.DataDir = DataDir
+
 		return cfg, nil
 	default:
 		cfg, err := NewConfig()
