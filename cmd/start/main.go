@@ -52,10 +52,14 @@ func main() {
 	}
 	svisor := supervisor.New("fly-etcd", 5*time.Minute)
 	svisor.AddProcess("fly-etcd", fmt.Sprintf("etcd --config-file %s", flyetcd.ConfigFilePath))
-	svisor.AddProcess("admin", "/usr/local/bin/start-api")
+	svisor.AddProcess("admin", "/usr/local/bin/start-api",
+		supervisor.WithRestart(0, time.Second*5),
+	)
 
 	if backupsEnabled() {
-		svisor.AddProcess("etcd-backup", "/usr/local/bin/etcd-backup")
+		svisor.AddProcess("etcd-backup", "/usr/local/bin/etcd-backup",
+			supervisor.WithRestart(0, time.Second*5),
+		)
 	} else {
 		log.Println("[WARN] Backups are not configured!")
 	}
