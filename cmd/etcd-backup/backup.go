@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -14,7 +13,6 @@ import (
 
 const (
 	defaultBackupInterval = 1 * time.Hour
-	backupLogPath         = "/data/backup.log"
 )
 
 var (
@@ -76,7 +74,7 @@ func maybeBackup(ctx context.Context, cli *flyetcd.Client, s3Client *flyetcd.S3C
 	isLeader, err := cli.IsLeader(ctx, machineID)
 	if err != nil {
 		log.Printf("[error] Failed to check leader status: %v", err)
-		// If we can’t determine leadership, default to checking again in backupInterval
+		// If we can not determine leadership, default to checking again in backupInterval
 		return backupInterval
 	}
 	if !isLeader {
@@ -84,7 +82,7 @@ func maybeBackup(ctx context.Context, cli *flyetcd.Client, s3Client *flyetcd.S3C
 		return backupInterval
 	}
 
-	lastTime, err := lastBackupTime()
+	lastTime, err := s3Client.LastBackupTaken(ctx)
 	if err != nil {
 		log.Printf("[error] Failed to get last backup time: %v", err)
 		return -1
@@ -97,15 +95,11 @@ func maybeBackup(ctx context.Context, cli *flyetcd.Client, s3Client *flyetcd.S3C
 	}
 
 	log.Printf("[info] Performing backup now...")
-	now := time.Now()
 	if err := performBackup(ctx, cli, s3Client); err != nil {
 		log.Printf("[warn] Backup failed: %v", err)
 		backupSuccess.Set(0)
 	} else {
 		backupSuccess.Set(1)
-		if err := updateLastBackupTime(now); err != nil {
-			log.Printf("[error] Failed to update last backup time: %v", err)
-		}
 	}
 
 	return backupInterval
@@ -153,52 +147,6 @@ func performBackup(parentCtx context.Context, cli *flyetcd.Client, s3Client *fly
 	log.Printf("[info] Backup successful (%0.2f MB): %s, version: %s", float64(fi.Size())/(1024*1024), s3Client.S3Path(), version)
 
 	return nil
-}
-
-// updateLastBackupTime writes the current time to the backup log file
-func updateLastBackupTime(t time.Time) error {
-	backupLog, err := os.OpenFile(backupLogPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
-	if err != nil {
-		return fmt.Errorf("failed to open backup log: %v", err)
-	}
-	defer func() {
-		_ = backupLog.Close()
-	}()
-
-	if _, err := fmt.Fprintf(backupLog, "%s\n", t.Format(time.RFC3339)); err != nil {
-		return fmt.Errorf("failed to write backup time: %v", err)
-	}
-
-	return backupLog.Sync()
-}
-
-func lastBackupTime() (time.Time, error) {
-	_, err := os.Stat(backupLogPath)
-	if os.IsNotExist(err) {
-		return time.Time{}, nil
-	}
-
-	backupLog, err := os.OpenFile(backupLogPath, os.O_RDONLY, 0666)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to open backup log: %w", err)
-	}
-	defer func() {
-		_ = backupLog.Close()
-	}()
-
-	var timeStr string
-	if _, err := fmt.Fscanln(backupLog, &timeStr); err != nil {
-		if err == io.EOF {
-			return time.Time{}, nil
-		}
-		return time.Time{}, fmt.Errorf("failed to read backup time: %w", err)
-	}
-
-	lastBackup, err := time.Parse(time.RFC3339, timeStr)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to parse backup time: %w", err)
-	}
-	return lastBackup, nil
 }
 
 func resolveBackupInterval() time.Duration {

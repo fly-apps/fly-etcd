@@ -123,7 +123,7 @@ func (s *S3Client) ListBackups(ctx context.Context) ([]BackupVersion, error) {
 	input := &s3.ListObjectVersionsInput{
 		Bucket:  aws.String(s.bucket),
 		Prefix:  aws.String(s.prefix),
-		MaxKeys: aws.Int32(100),
+		MaxKeys: aws.Int32(24),
 	}
 
 	result, err := s.Client.ListObjectVersions(ctx, input)
@@ -149,6 +149,19 @@ func (s *S3Client) ListBackups(ctx context.Context) ([]BackupVersion, error) {
 	})
 
 	return versions, nil
+}
+
+func (s *S3Client) LastBackupTaken(ctx context.Context) (time.Time, error) {
+	versions, err := s.ListBackups(ctx)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to list backups: %w", err)
+	}
+
+	if len(versions) == 0 {
+		return time.Time{}, nil
+	}
+
+	return versions[0].LastModified, nil
 }
 
 func (s *S3Client) testS3Credentials(ctx context.Context) error {
