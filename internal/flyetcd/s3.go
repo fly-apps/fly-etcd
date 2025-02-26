@@ -152,16 +152,15 @@ func (s *S3Client) ListBackups(ctx context.Context) ([]BackupVersion, error) {
 }
 
 func (s *S3Client) LastBackupTaken(ctx context.Context) (time.Time, error) {
-	versions, err := s.ListBackups(ctx)
+	obj, err := s.Client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(filepath.Join(s.prefix, S3BackupName)),
+	})
 	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to list backups: %w", err)
+		return time.Time{}, err
 	}
 
-	if len(versions) == 0 {
-		return time.Time{}, nil
-	}
-
-	return versions[0].LastModified, nil
+	return *obj.LastModified, nil
 }
 
 func (s *S3Client) testS3Credentials(ctx context.Context) error {
