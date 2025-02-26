@@ -77,10 +77,6 @@ func maybeBackup(ctx context.Context, cli *flyetcd.Client, s3Client *flyetcd.S3C
 		// If we can not determine leadership, default to checking again in backupInterval
 		return backupInterval
 	}
-	if !isLeader {
-		log.Printf("[info] Not the leader, so skipping backup.")
-		return backupInterval
-	}
 
 	lastTime, err := s3Client.LastBackupTaken(ctx)
 	if err != nil {
@@ -88,13 +84,19 @@ func maybeBackup(ctx context.Context, cli *flyetcd.Client, s3Client *flyetcd.S3C
 		return -1
 	}
 
+	// Calculate the interval, regardless of whether or not we are the leader.
+	// This is to accommodate deploys where the booting instance will never be the leader.
 	interval := time.Until(lastTime.Add(backupInterval))
 	if interval > 0 {
-		log.Printf("[info] Next backup in %v", interval)
+		log.Printf("[info] Next backup will be performed in %v", interval)
 		return interval
 	}
 
-	log.Printf("[info] Performing backup now...")
+	if !isLeader {
+		return backupInterval
+	}
+
+	log.Printf("[info] Performing backup...")
 	if err := performBackup(ctx, cli, s3Client); err != nil {
 		log.Printf("[warn] Backup failed: %v", err)
 		backupSuccess.Set(0)
