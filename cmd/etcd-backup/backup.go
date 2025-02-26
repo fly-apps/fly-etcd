@@ -171,7 +171,7 @@ func performBackup(parentCtx context.Context, cli *flyetcd.Client, s3Client *fly
 		return fmt.Errorf("failed to upload backup: %w", err)
 	}
 
-	log.Printf("[info] Backup successful (%0.2f MB), version: %s", float64(fi.Size())/(1024*1024), version)
+	log.Printf("[info] Backup successful. Size: %0.2f MiB, Version: %s", float64(fi.Size())/(1024*1024), version)
 
 	return nil
 }
