@@ -58,7 +58,7 @@ root@17816955c12958:/# flyadmin member list
 ```
 
 
-**2. If the Member happens to hold leaderer, transfer that leadership.**
+**2. If the Member happens to be the leader, transfer leadership.**
 
 ```
 etcdctl move-leader <target-member-id>
@@ -93,7 +93,7 @@ flyadmin member remove <member-id>
 ## Backups and Restoring from backups
 
 ### Enabling backups
-If the following environment variables are set, a backup will be performed and uploaded to S3 on a schedule:
+If the following secrets are set, automatic backups will be performed and uploaded to S3:
 
 **Static credentials:**
 ```
@@ -108,7 +108,7 @@ AWS_ROLE_ARN
 AWS_REGION
 ```
 
-Optional environment variables:
+**Optional environment variables:**
 ```
 S3_BUCKET (default: fly-etcd-backups)
 BACKUP_INTERVAL (default: "1h")
@@ -137,15 +137,23 @@ Backup uploaded to S3 as version: KK_iJNSYrBzdTzNFZByMICrUcFKo9j8o
 
 ### Restoring from a backup
 
-A backup can be restored using the following process:
 
-**1. Scale down Etcd to a single node**
-Specific instructions for this is coming soon, but the "replacing" machines instructions is close.
+**1. Scale cluster down to a single member**
+
+```
+# Stop a non-leader Machine
+fly m stop <machine-id>
+
+# Remove the associated member from the cluster
+flyadmin member remove <member-id>
+```
 
 **2. Select which backup you'd like to restore**
-List the backups and identify the ID of the you'd like to restore.
+
+List the backups with `flyadmin backup list` and identify the ID/Version of the you'd like to restore from.
 
 **3. Initiate the restore.**
+
 **WARNING: This will blow away existing data**
 ```
 root@148e6d1a149508:/# flyadmin b restore KK_iJNSYrBzdTzNFZByMICrUcFKo9j8o
@@ -170,4 +178,21 @@ fly m restart <machine-id>
 ```
 
 **5. Scale Etcd cluster back up to 3 nodes**
-See horizontal scaling instructions.
+
+```
+fly m clone <machine-id>
+```
+
+**6. Verify cluster status**
+
+```
+root@3d8d73ddb40e18:/# flyadmin endpoint status
++-----------------------------------------------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+|                            ENDPOINT                             |        ID        | VERSION | DB SIZE | IS LEADER | IS LEARNER | RAFT TERM | RAFT INDEX | RAFT APPLIED INDEX | ERRORS |
++-----------------------------------------------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+| http://4d89d600b32628.vm.fks-fly-pg-pg-qmx-1-etcd.internal:2379 |  246a9e512b30e8f |  3.5.16 |   22 MB |      true |      false |        10 |    2604590 |            2604590 |        |
+| http://3d8d73ddb40e18.vm.fks-fly-pg-pg-qmx-1-etcd.internal:2379 | c919583d728770d8 |  3.5.16 |   22 MB |     false |      false |        10 |    2604590 |            2604590 |        |
+| http://17816955c12958.vm.fks-fly-pg-pg-qmx-1-etcd.internal:2379 | fe893594d308d1b6 |  3.5.16 |   22 MB |     false |      false |        10 |    2604590 |            2604590 |        |
++-----------------------------------------------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+```
+**
