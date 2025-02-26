@@ -54,11 +54,17 @@ This clone command is preferred over `fly scale count N` as it enforces unique z
    fly machine stop <machine-id>
    ```
 
-4. **Remove the member from the cluster**
+4. **Remove member from the cluster**
 
    ```bash
    flyadmin member remove <member-id>
    ```
+
+5. **Clone an existing member**
+
+```bash
+fly machine clone <machine-id>
+````
 
 ## Backups and Restoration
 
