@@ -101,7 +101,10 @@ func maybeBackup(ctx context.Context, cli *flyetcd.Client, s3Client *flyetcd.S3C
 	nextBackupTime := lastTime.Add(backupInterval)
 	timeUntilNext := time.Until(nextBackupTime)
 	if timeUntilNext > 0 {
-		log.Printf("[info] Next backup is scheduled in %v", timeUntilNext)
+		if isLeader {
+			// Conditional just to reduce log spam
+			log.Printf("[info] Next backup is scheduled in %v", timeUntilNext)
+		}
 		return timeUntilNext
 	}
 
