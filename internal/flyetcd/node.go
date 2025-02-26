@@ -79,9 +79,10 @@ func resolveConfig() (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to load config: %w", err)
 		}
-		// This is a workaround for existing clusters that may have the wrong
-		// data dir set.
+
+		// Dynamic configuration settings that may need to be adjusted on boot.
 		cfg.DataDir = DataDir
+		cfg.ListenMetricsUrls = MetricsBaseURL
 
 		return cfg, nil
 	default:

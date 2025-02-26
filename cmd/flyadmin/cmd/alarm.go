@@ -14,13 +14,12 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(alarmsCmd)
-	alarmsCmd.AddCommand(alarmListCmd)
-	alarmsCmd.AddCommand(alarmDisarmCmd)
-
+	rootCmd.AddCommand(alarmCmd)
+	alarmCmd.AddCommand(alarmListCmd)
+	alarmCmd.AddCommand(alarmDisarmCmd)
 }
 
-var alarmsCmd = &cobra.Command{
+var alarmCmd = &cobra.Command{
 	Use:   "alarm",
 	Short: "Manage Etcd alarms",
 	Long:  `Manage Etcd cluster alarms`,

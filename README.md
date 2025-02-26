@@ -26,7 +26,7 @@ fly machines clone <machine-id>
 
 This clone command is preferrred over `fly scale count N` as it enforces unique zones for volume placement.  Newly provisioned members will automatically join an existing cluster.
 
-### Replacing members 
+### Replacing members
 In the event you need to replace a member, it's always better to add the new member first before removing an old member.
 
 _Note: This is not always possible given the number of unique zones within some regions._
@@ -64,7 +64,7 @@ root@17816955c12958:/# flyadmin member list
 etcdctl move-leader <target-member-id>
 ```
 
-Assuming this command went through ok, you can move onto the next step.  
+Assuming this command went through ok, you can move onto the next step.
 
 
 **3. Stop the Machine ( easier if you do this within a separate terminal session)**
@@ -76,7 +76,7 @@ That being the case, I recommend stopping the Machine first
 fly machine stop <machine-id>
 ```
 
-**4. Remove the member from the cluster** 
+**4. Remove the member from the cluster**
 
 ```
 flyadmin member remove <member-id>
@@ -88,3 +88,86 @@ flyadmin member remove <member-id>
 ## Monitoring
 
 ## Recovering from Quorum loss
+
+
+## Backups and Restoring from backups
+
+### Enabling backups
+If the following environment variables are set, a backup will be performed and uploaded to S3 on a schedule:
+
+**Static credentials:**
+```
+AWS_SECRET_ACCESS_KEY
+AWS_ACCESS_KEY_ID
+AWS_REGION
+```
+
+**OIDC based-auth:**
+```
+AWS_ROLE_ARN
+AWS_REGION
+```
+
+Optional environment variables:
+```
+S3_BUCKET (default: fly-etcd-backups)
+BACKUP_INTERVAL (default: "1h")
+```
+
+### Listing backups
+```
+root@148e6d1a149508:/data# flyadmin backup list
++----------------------------------+----------------------+-------+--------+
+|                ID                |    LAST MODIFIED     | SIZE  | LATEST |
++----------------------------------+----------------------+-------+--------+
+| cgPHQidz89s6_.0AOxymGy7PPU9CPRe5 | 2025-02-25T16:11:44Z | 29 kB |   true |
+| .Nyq9HkyaqmTa0KXz_YcUNBcUtsOIsB2 | 2025-02-25T16:09:20Z | 29 kB |  false |
+| JTP41hf8vKNTDFZKjbv_G2WoBO.p0XRq | 2025-02-25T01:36:04Z | 29 kB |  false |
++----------------------------------+----------------------+-------+--------+
+```
+
+### Creating on-demand backup
+```
+root@148e6d1a149508:/# flyadmin backup create
+{"level":"info","ts":"2025-02-25T17:42:40.435283Z","logger":"etcd-client","caller":"v3@v3.5.18/maintenance.go:212","msg":"opened snapshot stream; downloading"}
+{"level":"info","ts":"2025-02-25T17:42:40.439366Z","logger":"etcd-client","caller":"v3@v3.5.18/maintenance.go:220","msg":"completed snapshot read; closing"}
+Backup created: /tmp/etcd-manual-backup2660955671/backup-20250225-174240.db (29 kB)
+Backup uploaded to S3 as version: KK_iJNSYrBzdTzNFZByMICrUcFKo9j8o
+```
+
+### Restoring from a backup
+
+A backup can be restored using the following process:
+
+**1. Scale down Etcd to a single node**
+Specific instructions for this is coming soon, but the "replacing" machines instructions is close.
+
+**2. Select which backup you'd like to restore**
+List the backups and identify the ID of the you'd like to restore.
+
+**3. Initiate the restore.**
+**WARNING: This will blow away existing data**
+```
+root@148e6d1a149508:/# flyadmin b restore KK_iJNSYrBzdTzNFZByMICrUcFKo9j8o
++----------+----------+------------+------------+
+|   HASH   | REVISION | TOTAL KEYS | TOTAL SIZE |
++----------+----------+------------+------------+
+| 7814136d |        3 |         10 |      29 kB |
++----------+----------+------------+------------+
+Backup KK_iJNSYrBzdTzNFZByMICrUcFKo9j8o downloaded and saved to /tmp/etcd-restore-674497690/backup-restore.db
+2025/02/25 17:46:54 Found etcd process (PID 650) with args: [etcd --config-file /data/etcd.yaml ]
+Deprecated: Use `etcdutl snapshot restore` instead.
+
+2025-02-25T17:46:56Z	info	snapshot/v3_snapshot.go:265	restoring snapshot	{"path": "/tmp/etcd-restore-674497690/backup-restore.db", "wal-dir": "/data/member/wal", "data-dir": "/data", "snap-dir": "/data/member/snap", "initial-memory-map-size": 0}
+2025-02-25T17:46:56Z	info	membership/store.go:141	Trimming membership information from the backend...
+2025-02-25T17:46:56Z	info	membership/cluster.go:421	added member	{"cluster-id": "b14f8c3fd657c435", "local-member-id": "0", "added-peer-id": "36f3ddaf5915706b", "added-peer-peer-urls": ["http://148e6d1a149508.vm.shaun-etcd-test.internal:2380"]}
+2025-02-25T17:46:56Z	info	snapshot/v3_snapshot.go:293	restored snapshot	{"path": "/tmp/etcd-restore-674497690/backup-restore.db", "wal-dir": "/data/member/wal", "data-dir": "/data", "snap-dir": "/data/member/snap", "initial-memory-map-size": 0}
+```
+
+**4. Restart the machine**
+```
+fly m restart <machine-id>
+```
+
+**5. Scale Etcd cluster back up to 3 nodes**
+See horizontal scaling instructions.
