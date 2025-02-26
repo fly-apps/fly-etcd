@@ -28,10 +28,6 @@ This clone command is preferred over `fly scale count N` as it enforces unique z
 
 ### Replacing Members
 
-In the event you need to replace a member, it's better to add the new member first before removing an old one.
-
-> **Note:** This is not always possible given the number of unique zones within some regions.
-
 1. **Identify the Member `id` and `name` of the member you want to remove.**
 
    SSH into one of the member machines and use these helper commands:
