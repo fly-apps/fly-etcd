@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/aws/smithy-go"
 	"github.com/fly-apps/fly-etcd/internal/flyetcd"
 )
 
@@ -74,28 +76,50 @@ func maybeBackup(ctx context.Context, cli *flyetcd.Client, s3Client *flyetcd.S3C
 	isLeader, err := cli.IsLeader(ctx, machineID)
 	if err != nil {
 		log.Printf("[error] Failed to check leader status: %v", err)
-		// If we can not determine leadership, default to checking again in backupInterval
 		return backupInterval
 	}
 
+	// Get last backup time
 	lastTime, err := s3Client.LastBackupTaken(ctx)
 	if err != nil {
-		log.Printf("[error] Failed to get last backup time: %v", err)
-		return -1
+		if isNotFoundErr(err) {
+			if isLeader {
+				doBackup(ctx, cli, s3Client)
+				return backupInterval
+			}
+			// Schedule a re-check one minute from now. We will never boot as a leader, so provides
+			// a small window for leadership to settle after a deploy.
+			lastTime = time.Now().Add(-backupInterval + time.Minute)
+		} else {
+			log.Printf("[error] Failed to get last backup time: %v", err)
+			return backupInterval
+		}
 	}
 
-	// Calculate the interval, regardless of whether or not we are the leader.
-	// This is to accommodate deploys where the booting instance will never be the leader.
-	interval := time.Until(lastTime.Add(backupInterval))
-	if interval > 0 {
-		log.Printf("[info] Next backup will be performed in %v", interval)
-		return interval
+	// Calculate the interval regardless of whether or not we are the leader.
+	// This is to accommodate deploys when the booting instance will never be the leader.
+	nextBackupTime := lastTime.Add(backupInterval)
+	timeUntilNext := time.Until(nextBackupTime)
+	if timeUntilNext > 0 {
+		log.Printf("[info] Next backup is scheduled in %v", timeUntilNext)
+		return timeUntilNext
 	}
 
 	if !isLeader {
 		return backupInterval
 	}
 
+	doBackup(ctx, cli, s3Client)
+
+	return backupInterval
+}
+
+func isNotFoundErr(err error) bool {
+	var apiErr smithy.APIError
+	return errors.As(err, &apiErr) && apiErr.ErrorCode() == "NotFound"
+}
+
+func doBackup(ctx context.Context, cli *flyetcd.Client, s3Client *flyetcd.S3Client) {
 	log.Printf("[info] Performing backup...")
 	if err := performBackup(ctx, cli, s3Client); err != nil {
 		log.Printf("[warn] Backup failed: %v", err)
@@ -103,8 +127,6 @@ func maybeBackup(ctx context.Context, cli *flyetcd.Client, s3Client *flyetcd.S3C
 	} else {
 		backupSuccess.Set(1)
 	}
-
-	return backupInterval
 }
 
 func performBackup(parentCtx context.Context, cli *flyetcd.Client, s3Client *flyetcd.S3Client) error {
@@ -146,7 +168,7 @@ func performBackup(parentCtx context.Context, cli *flyetcd.Client, s3Client *fly
 		return fmt.Errorf("failed to upload backup: %w", err)
 	}
 
-	log.Printf("[info] Backup successful (%0.2f MB), version: %s", float64(fi.Size())/(1024*1024), version)
+	log.Printf("[info] Backup successful. Size: %0.2f MiB, Version: %s", float64(fi.Size())/(1024*1024), version)
 
 	return nil
 }
