@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	yaml "gopkg.in/yaml.v3"
 )
@@ -36,9 +37,10 @@ type Config struct {
 	AutoCompactionRetention  string `yaml:"auto-compaction-retention"`
 	AuthToken                string `yaml:"auth-token"`
 
-	MaxSnapshots  int `yaml:"max-snapshots"`
-	MaxWals       int `yaml:"max-wals"`
-	SnapshotCount int `yaml:"snapshot-count"`
+	MaxSnapshots      int `yaml:"max-snapshots"`
+	MaxWals           int `yaml:"max-wals"`
+	SnapshotCount     int `yaml:"snapshot-count"`
+	QuotaBackendBytes int `yaml:"quota-backend-bytes"`
 }
 
 func NewConfig() (*Config, error) {
@@ -65,7 +67,8 @@ func NewConfig() (*Config, error) {
 		AuthToken:               "",
 		MaxSnapshots:            10,
 		MaxWals:                 10,
-		SnapshotCount:           10000, // Default
+		SnapshotCount:           10000,      // Default
+		QuotaBackendBytes:       2147483648, // 2GiB
 	}
 
 	if err := cfg.SetAuthToken(); err != nil {
@@ -127,18 +130,33 @@ func (c *Config) SetAuthToken() error {
 	return nil
 }
 
-func loadConfig() (*Config, error) {
-	var config Config
-	yamlFile, err := os.ReadFile(ConfigFilePath)
-	if err != nil {
-		return nil, err
-	}
-	err = yaml.Unmarshal(yamlFile, &config)
-	if err != nil {
-		return nil, err
+func getEnvOrDefault[T string | int | bool](key string, fallback T) T {
+	val, ok := os.LookupEnv(key)
+	if !ok {
+		return fallback
 	}
 
-	return &config, nil
+	var result any
+	switch any(fallback).(type) {
+	case string:
+		result = val
+	case int:
+		n, err := strconv.Atoi(val)
+		if err != nil {
+			log.Printf("invalid value for %s, using default: %v", key, err)
+			return fallback
+		}
+		result = n
+	case bool:
+		b, err := strconv.ParseBool(val)
+		if err != nil {
+			log.Printf("invalid value for %s, using default: %v", key, err)
+			return fallback
+		}
+		result = b
+	}
+
+	return result.(T)
 }
 
 func isJWTAuthEnabled() bool {

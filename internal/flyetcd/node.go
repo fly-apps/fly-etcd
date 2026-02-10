@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	yaml "gopkg.in/yaml.v3"
 )
 
 type Node struct {
@@ -73,25 +75,35 @@ func (n *Node) Bootstrap(ctx context.Context) error {
 }
 
 func resolveConfig() (*Config, error) {
-	switch ConfigFilePresent() {
-	case true:
-		cfg, err := loadConfig()
+	// NewConfig provides sane defaults for fields that may not be present in
+	// older config files. The config file will overlay on top of these defaults.
+	cfg, err := NewConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config: %w", err)
+	}
+
+	if ConfigFilePresent() {
+		yamlFile, err := os.ReadFile(ConfigFilePath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load config: %w", err)
+			return nil, fmt.Errorf("failed to read config: %w", err)
+		}
+
+		if err := yaml.Unmarshal(yamlFile, cfg); err != nil {
+			return nil, fmt.Errorf("failed to parse config: %w", err)
 		}
 
 		// Dynamic configuration settings that may need to be adjusted on boot.
 		cfg.DataDir = DataDir
 		cfg.ListenMetricsUrls = MetricsBaseURL
-
-		return cfg, nil
-	default:
-		cfg, err := NewConfig()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create new config: %w", err)
-		}
-		return cfg, nil
 	}
+
+	// Env vars override everything.
+	cfg.MaxSnapshots = getEnvOrDefault("ETCD_MAX_SNAPSHOTS", cfg.MaxSnapshots)
+	cfg.MaxWals = getEnvOrDefault("ETCD_MAX_WALS", cfg.MaxWals)
+	cfg.SnapshotCount = getEnvOrDefault("ETCD_SNAPSHOT_COUNT", cfg.SnapshotCount)
+	cfg.QuotaBackendBytes = getEnvOrDefault("ETCD_QUOTA_BACKEND_BYTES", cfg.QuotaBackendBytes)
+
+	return cfg, nil
 }
 
 // clusterInitialized will check-in with the the other nodes within the network
