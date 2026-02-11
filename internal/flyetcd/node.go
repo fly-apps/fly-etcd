@@ -75,13 +75,10 @@ func (n *Node) Bootstrap(ctx context.Context) error {
 }
 
 func resolveConfig() (*Config, error) {
-	// NewConfig provides sane defaults for fields that may not be present in
-	// older config files. The config file will overlay on top of these defaults.
-	cfg, err := NewConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create config: %w", err)
-	}
+	cfg := DefaultConfig()
 
+	// When the config file is present, we overlay it on top of the defaults.
+	// This ensures important fields are set while also preserving any custom settings.
 	if ConfigFilePresent() {
 		yamlFile, err := os.ReadFile(ConfigFilePath)
 		if err != nil {
@@ -102,6 +99,12 @@ func resolveConfig() (*Config, error) {
 	cfg.MaxWals = getEnvOrDefault("ETCD_MAX_WALS", cfg.MaxWals)
 	cfg.SnapshotCount = getEnvOrDefault("ETCD_SNAPSHOT_COUNT", cfg.SnapshotCount)
 	cfg.QuotaBackendBytes = getEnvOrDefault("ETCD_QUOTA_BACKEND_BYTES", cfg.QuotaBackendBytes)
+	cfg.AutoCompactionMode = getEnvOrDefault("ETCD_AUTO_COMPACTION_MODE", cfg.AutoCompactionMode)
+	cfg.AutoCompactionRetention = getEnvOrDefault("ETCD_AUTO_COMPACTION_RETENTION", cfg.AutoCompactionRetention)
+
+	if err := cfg.SetAuthToken(); err != nil {
+		return nil, fmt.Errorf("failed to set auth token: %w", err)
+	}
 
 	return cfg, nil
 }

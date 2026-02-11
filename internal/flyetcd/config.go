@@ -10,10 +10,12 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-const (
+var (
 	DataDir        = "/data"
 	ConfigFilePath = "/data/etcd.yaml"
+)
 
+const (
 	MetricsBaseURL  = "http://[::]:2381"
 	MetricsEndpoint = "http://[::]:2381/metrics"
 )
@@ -43,10 +45,10 @@ type Config struct {
 	QuotaBackendBytes int `yaml:"quota-backend-bytes"`
 }
 
-func NewConfig() (*Config, error) {
+func DefaultConfig() *Config {
 	endpoint := NewEndpoint(os.Getenv("FLY_MACHINE_ID"))
 
-	cfg := &Config{
+	return &Config{
 		Name:              endpoint.Name,
 		ListenPeerUrls:    "http://[::]:2380",
 		ListenClientUrls:  "http://[::]:2379",
@@ -67,9 +69,13 @@ func NewConfig() (*Config, error) {
 		AuthToken:               "",
 		MaxSnapshots:            10,
 		MaxWals:                 10,
-		SnapshotCount:           10000,      // Default
-		QuotaBackendBytes:       2147483648, // 2GiB
+		SnapshotCount:           10000,                  // Default
+		QuotaBackendBytes:       2 * 1024 * 1024 * 1024, // 2GiB
 	}
+}
+
+func NewConfig() (*Config, error) {
+	cfg := DefaultConfig()
 
 	if err := cfg.SetAuthToken(); err != nil {
 		return nil, fmt.Errorf("failed to set auth token: %w", err)
@@ -130,7 +136,7 @@ func (c *Config) SetAuthToken() error {
 	return nil
 }
 
-func getEnvOrDefault[T string | int | bool](key string, fallback T) T {
+func getEnvOrDefault[T string | int](key string, fallback T) T {
 	val, ok := os.LookupEnv(key)
 	if !ok {
 		return fallback
@@ -147,13 +153,6 @@ func getEnvOrDefault[T string | int | bool](key string, fallback T) T {
 			return fallback
 		}
 		result = n
-	case bool:
-		b, err := strconv.ParseBool(val)
-		if err != nil {
-			log.Printf("invalid value for %s, using default: %v", key, err)
-			return fallback
-		}
-		result = b
 	}
 
 	return result.(T)
