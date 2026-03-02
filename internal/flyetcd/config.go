@@ -5,14 +5,17 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	yaml "gopkg.in/yaml.v3"
 )
 
-const (
+var (
 	DataDir        = "/data"
 	ConfigFilePath = "/data/etcd.yaml"
+)
 
+const (
 	MetricsBaseURL  = "http://[::]:2381"
 	MetricsEndpoint = "http://[::]:2381/metrics"
 )
@@ -36,15 +39,16 @@ type Config struct {
 	AutoCompactionRetention  string `yaml:"auto-compaction-retention"`
 	AuthToken                string `yaml:"auth-token"`
 
-	MaxSnapshots  int `yaml:"max-snapshots"`
-	MaxWals       int `yaml:"max-wals"`
-	SnapshotCount int `yaml:"snapshot-count"`
+	MaxSnapshots      int `yaml:"max-snapshots"`
+	MaxWals           int `yaml:"max-wals"`
+	SnapshotCount     int `yaml:"snapshot-count"`
+	QuotaBackendBytes int `yaml:"quota-backend-bytes"`
 }
 
-func NewConfig() (*Config, error) {
+func DefaultConfig() *Config {
 	endpoint := NewEndpoint(os.Getenv("FLY_MACHINE_ID"))
 
-	cfg := &Config{
+	return &Config{
 		Name:              endpoint.Name,
 		ListenPeerUrls:    "http://[::]:2380",
 		ListenClientUrls:  "http://[::]:2379",
@@ -65,8 +69,13 @@ func NewConfig() (*Config, error) {
 		AuthToken:               "",
 		MaxSnapshots:            10,
 		MaxWals:                 10,
-		SnapshotCount:           10000, // Default
+		SnapshotCount:           10000,                  // Default
+		QuotaBackendBytes:       2 * 1024 * 1024 * 1024, // 2GiB
 	}
+}
+
+func NewConfig() (*Config, error) {
+	cfg := DefaultConfig()
 
 	if err := cfg.SetAuthToken(); err != nil {
 		return nil, fmt.Errorf("failed to set auth token: %w", err)
@@ -127,18 +136,26 @@ func (c *Config) SetAuthToken() error {
 	return nil
 }
 
-func loadConfig() (*Config, error) {
-	var config Config
-	yamlFile, err := os.ReadFile(ConfigFilePath)
-	if err != nil {
-		return nil, err
-	}
-	err = yaml.Unmarshal(yamlFile, &config)
-	if err != nil {
-		return nil, err
+func getEnvOrDefault[T string | int](key string, fallback T) T {
+	val, ok := os.LookupEnv(key)
+	if !ok {
+		return fallback
 	}
 
-	return &config, nil
+	var result any
+	switch any(fallback).(type) {
+	case string:
+		result = val
+	case int:
+		n, err := strconv.Atoi(val)
+		if err != nil {
+			log.Printf("invalid value for %s, using default: %v", key, err)
+			return fallback
+		}
+		result = n
+	}
+
+	return result.(T)
 }
 
 func isJWTAuthEnabled() bool {
