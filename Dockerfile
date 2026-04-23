@@ -17,7 +17,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -v -o /fly/bin/etcd-backup ./cmd/etcd-back
 RUN curl -L ${DOWNLOAD_URL}/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz -o /tmp/etcd-${ETCD_VERSION}-linux-amd64.tar.gz \
  && tar xzvf /tmp/etcd-${ETCD_VERSION}-linux-amd64.tar.gz -C /usr/local/bin --strip-components=1
 
-FROM debian:buster-slim
+FROM debian:bookworm-slim
 
 ARG FLY_VERSION
 ARG ETCD_VERSION
