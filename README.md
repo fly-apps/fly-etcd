@@ -66,6 +66,18 @@ This clone command is preferred over `fly scale count N` as it enforces unique z
 fly machine clone <machine-id>
 ````
 
+## Client Connectivity
+
+By default, each member advertises its own per-machine `.internal` Fly DNS name as its client URL. This works when clients are in the same Fly organization **and** the same Fly private network as the etcd app.
+
+If clients connect from a different Fly network (for example, isolated per-tenant apps reaching a shared etcd through a flycast address), set `ETCD_ADVERTISE_CLIENT_URLS` so every member advertises the cross-network address instead:
+
+```bash
+fly secrets set ETCD_ADVERTISE_CLIENT_URLS=http://<etcd-app-name>.flycast:2379
+```
+
+Peer URLs (used for replication) continue to use `.internal` and need no configuration. Peers always share the etcd app's own network.
+
 ## Backups and Restoration
 
 ### Enabling Backups

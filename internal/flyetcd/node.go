@@ -101,6 +101,7 @@ func resolveConfig() (*Config, error) {
 	cfg.QuotaBackendBytes = getEnvOrDefault("ETCD_QUOTA_BACKEND_BYTES", cfg.QuotaBackendBytes)
 	cfg.AutoCompactionMode = getEnvOrDefault("ETCD_AUTO_COMPACTION_MODE", cfg.AutoCompactionMode)
 	cfg.AutoCompactionRetention = getEnvOrDefault("ETCD_AUTO_COMPACTION_RETENTION", cfg.AutoCompactionRetention)
+	cfg.AdvertiseClientUrls = getEnvOrDefault("ETCD_ADVERTISE_CLIENT_URLS", cfg.AdvertiseClientUrls)
 
 	if err := cfg.SetAuthToken(); err != nil {
 		return nil, fmt.Errorf("failed to set auth token: %w", err)
