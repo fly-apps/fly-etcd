@@ -1,6 +1,6 @@
 FROM golang:1.22
 
-ENV ETCD_VERSION=v3.5.16
+ENV ETCD_VERSION=v3.5.30
 ARG FLY_VERSION=custom
 
 ENV DOWNLOAD_URL=https://github.com/etcd-io/etcd/releases/download
