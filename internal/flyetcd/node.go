@@ -3,6 +3,7 @@ package flyetcd
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -102,6 +103,13 @@ func resolveConfig() (*Config, error) {
 	cfg.AutoCompactionMode = getEnvOrDefault("ETCD_AUTO_COMPACTION_MODE", cfg.AutoCompactionMode)
 	cfg.AutoCompactionRetention = getEnvOrDefault("ETCD_AUTO_COMPACTION_RETENTION", cfg.AutoCompactionRetention)
 	cfg.AdvertiseClientUrls = getEnvOrDefault("ETCD_ADVERTISE_CLIENT_URLS", cfg.AdvertiseClientUrls)
+
+	cfg.BcryptCost = getEnvOrDefault("ETCD_BCRYPT_COST", cfg.BcryptCost)
+	if cfg.BcryptCost < minBcryptCost || cfg.BcryptCost > maxBcryptCost {
+		log.Printf("bcrypt-cost %d outside [%d, %d], using default %d",
+			cfg.BcryptCost, minBcryptCost, maxBcryptCost, defaultBcryptCost)
+		cfg.BcryptCost = defaultBcryptCost
+	}
 
 	if err := cfg.SetAuthToken(); err != nil {
 		return nil, fmt.Errorf("failed to set auth token: %w", err)

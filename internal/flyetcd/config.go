@@ -18,6 +18,10 @@ var (
 const (
 	MetricsBaseURL  = "http://[::]:2381"
 	MetricsEndpoint = "http://[::]:2381/metrics"
+
+	minBcryptCost     = 4
+	maxBcryptCost     = 31
+	defaultBcryptCost = 10
 )
 
 // Example configuration file: https://github.com/etcd-io/etcd/blob/release-3.5/etcd.conf.yml.sample
@@ -38,6 +42,7 @@ type Config struct {
 	AutoCompactionMode       string `yaml:"auto-compaction-mode"`
 	AutoCompactionRetention  string `yaml:"auto-compaction-retention"`
 	AuthToken                string `yaml:"auth-token"`
+	BcryptCost               int    `yaml:"bcrypt-cost"`
 
 	MaxSnapshots      int `yaml:"max-snapshots"`
 	MaxWals           int `yaml:"max-wals"`
@@ -67,6 +72,7 @@ func DefaultConfig() *Config {
 		AutoCompactionMode:      "periodic",
 		AutoCompactionRetention: "1",
 		AuthToken:               "",
+		BcryptCost:              defaultBcryptCost,
 		MaxSnapshots:            10,
 		MaxWals:                 10,
 		SnapshotCount:           10000,                  // Default

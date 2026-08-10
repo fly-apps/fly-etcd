@@ -173,6 +173,10 @@ func TestResolveConfig(t *testing.T) {
 			if cfg.AutoCompactionMode != "periodic" {
 				t.Errorf("expected auto-compaction-mode 'periodic', got %q", cfg.AutoCompactionMode)
 			}
+
+			if cfg.BcryptCost != defaultBcryptCost {
+				t.Errorf("expected bcrypt-cost %d, got %d", defaultBcryptCost, cfg.BcryptCost)
+			}
 		})
 
 		t.Run("env overrides", func(t *testing.T) {
@@ -181,6 +185,7 @@ func TestResolveConfig(t *testing.T) {
 			t.Setenv("ETCD_MAX_SNAPSHOTS", "20")
 			t.Setenv("ETCD_AUTO_COMPACTION_MODE", "revision")
 			t.Setenv("ETCD_AUTO_COMPACTION_RETENTION", "1000")
+			t.Setenv("ETCD_BCRYPT_COST", "4")
 
 			cfg, err := resolveConfig()
 			if err != nil {
@@ -204,9 +209,27 @@ func TestResolveConfig(t *testing.T) {
 				t.Errorf("expected auto-compaction-retention '1000', got %q", cfg.AutoCompactionRetention)
 			}
 
+			if cfg.BcryptCost != 4 {
+				t.Errorf("expected bcrypt-cost 4, got %d", cfg.BcryptCost)
+			}
+
 			// Unset env vars should keep defaults.
 			if cfg.MaxWals != 10 {
 				t.Errorf("expected max-wals 10, got %d", cfg.MaxWals)
+			}
+		})
+
+		t.Run("bcrypt cost out of range falls back to default", func(t *testing.T) {
+			setupTestDirs(t)
+			t.Setenv("ETCD_BCRYPT_COST", "99")
+
+			cfg, err := resolveConfig()
+			if err != nil {
+				t.Fatalf("resolveConfig failed: %v", err)
+			}
+
+			if cfg.BcryptCost != defaultBcryptCost {
+				t.Errorf("expected bcrypt-cost %d, got %d", defaultBcryptCost, cfg.BcryptCost)
 			}
 		})
 	})
@@ -345,6 +368,27 @@ max-snapshots: 5
 			// Other fields should be kept.
 			if cfg.MaxSnapshots != 5 {
 				t.Errorf("expected max-snapshots 5, got %d", cfg.MaxSnapshots)
+			}
+		})
+
+		t.Run("bcrypt cost from config file preserved", func(t *testing.T) {
+			tmpDir := setupTestDirs(t)
+
+			configYAML := []byte(`
+name: existing-node
+bcrypt-cost: 6
+`)
+			if err := os.WriteFile(filepath.Join(tmpDir, "etcd.yaml"), configYAML, 0644); err != nil {
+				t.Fatalf("failed to write config: %v", err)
+			}
+
+			cfg, err := resolveConfig()
+			if err != nil {
+				t.Fatalf("resolveConfig failed: %v", err)
+			}
+
+			if cfg.BcryptCost != 6 {
+				t.Errorf("expected bcrypt-cost 6, got %d", cfg.BcryptCost)
 			}
 		})
 
